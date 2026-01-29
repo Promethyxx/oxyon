@@ -19,6 +19,11 @@ Clone the repository:
 ```bash
 git clone https://github.com/Promethyxx/oxyon
 cd oxyon
-cargo build --release
+
+# Create a key.env file in the root directory and add:
+# TMDB_KEY=your_tmdb_key
+# FANART_KEY=your_fanart_key
+
+cargo build --release```
 
 ⚠️ Make sure the external tools (7zip, ExifTool, FFmpeg, MKVToolNix, Pandoc) are installed and accessible in your PATH.
