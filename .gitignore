@@ -15,4 +15,4 @@
 key.envbin/
 bin/
 target/
-.env
+key.env
