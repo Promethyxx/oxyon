@@ -5,12 +5,13 @@
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE.txt)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 
-**Oxyon** is a powerful Rust-based file converter with a graphical user interface that brings together industry-leading conversion tools into one unified application.
+**Oxyon** is a unified multimedia toolbox built in Rust:  
+file conversion, movie & TV scraping, and media tagging — all in one graphical interface.
 
 ## 🎯 Overview
 
-Oxyon provides an easy-to-use GUI interface for major file processing libraries, making powerful command-line tools accessible to everyone:
-
+Oxyon provides an easy-to-use GUI interface for major file processing libraries  
+**and media databases**, making complex multimedia workflows accessible without the command line.
 - **7zip** – Archive compression and decompression
 - **ExifTool** – Metadata reading and writing for images, videos, and documents
 - **FFmpeg** – Audio and video encoding, decoding, and conversion
@@ -19,13 +20,23 @@ Oxyon provides an easy-to-use GUI interface for major file processing libraries,
 
 ## ✨ Features
 
-- 🎬 **Video Conversion**: Convert between various video formats (MP4, MKV, AVI, etc.)
-- 🎵 **Audio Processing**: Extract, convert, and process audio files
-- 📄 **Document Conversion**: Transform documents between multiple formats (PDF, DOCX, HTML, etc.)
-- 🖼️ **Image Metadata**: Read and edit EXIF data from photos
+### 🔁 File Conversion
+- 🎬 **Video Conversion**: Convert between common video formats (MP4, MKV, AVI, etc.)
+- 🎵 **Audio Processing**: Extract, convert, and process audio tracks
+- 📄 **Document Conversion**: Transform documents between formats (PDF, DOCX, HTML, Markdown…)
 - 📦 **Archive Management**: Create and extract compressed archives
-- 🎨 **Modern GUI**: User-friendly interface built with Rust
-- 🎭 **Media Metadata**: Fetch movie and TV show metadata via TMDB and FanArt APIs
+
+### 🏷️ Metadata & Tagging
+- 🖼️ **Image Metadata**: Read and edit EXIF metadata
+- 🎞️ **Media Tagging**: Write metadata directly into media files (titles, dates, artwork)
+
+### 🎭 Media Scraping
+- 🎬 **Movie & TV Metadata**: Fetch information from TMDB and FanArt
+- 🖼️ **Artwork Retrieval**: Posters, backdrops, logos, and fanart
+
+### 🎨 Interface
+- 🧭 **Unified GUI**: One consistent interface for all tools
+- ⚙️ **Tool Abstraction**: Powerful CLI tools without command-line complexity
 
 ## 📋 Prerequisites
 
@@ -127,6 +138,14 @@ Or on Windows:
 4. Configure conversion settings (optional)
 5. Click "Convert" and wait for the process to complete
 
+### 🎬 Typical Workflow
+
+1. Load a movie or TV episode
+2. Fetch metadata from TMDB
+3. Automatically tag the file (title, year, artwork)
+4. Convert or remux if needed
+5. Export a clean, ready-to-archive media file
+
 ### Example Use Cases
 
 - **Convert video to MP4**: Load a video file, select MP4 output, adjust quality settings
@@ -162,14 +181,9 @@ Edit `oxyon_config.toml` to customize:
 
 Check the [Issues](https://github.com/Promethyxx/oxyon/issues) page for current bugs and feature requests.
 
-## 🗺️ Roadmap
+## 🗺️ Roadmap (planned)
 
-- [ ] Batch processing support
-- [ ] Custom conversion profiles
-- [ ] Progress tracking improvements
-- [ ] Additional format support
-- [ ] Localization (multi-language support)
-- [ ] Dark/Light theme toggle
+The features are actively planned and tracked via GitHub issues.
 
 ## 🤝 Contributing
 
