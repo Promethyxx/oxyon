@@ -1,0 +1,27 @@
+[package]
+name = "oxyon"
+version = "0.1.1"
+edition = "2024"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+chrono = "0.4.43"
+eframe = "0.29"
+image = "0.25"
+kamadak-exif = "0.5"
+quick-xml = "0.39.0"
+regex = "1.10"
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+rfd = "0.17.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+which = "8.0.0"
+
+[build-dependencies]
+embed-resource = "2.4"
+
+[profile.release]
+opt-level = 0
+lto = false
+codegen-units = 256 # Maximum de parallélisation
