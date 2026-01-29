@@ -96,6 +96,29 @@ Or on Windows:
 .\target\release\oxyon.exe
 ```
 
+## 📸 Screenshots
+
+### Archive
+![Archive Module](screenshots/Archive.png)
+
+### Audio
+![Audio Module](screenshots/Audio.png)
+
+### Document
+![Document Module](screenshots/Doc.png)
+
+### Image
+![Image Module](screenshots/Image.png)
+
+### Scraping
+![Scraping Module](screenshots/Scrap.png)
+
+### Media Tagging
+![Tagging Module](screenshots/Tag.png)
+
+### Video
+![Video Module](screenshots/Video.png)
+
 ## 💻 Usage
 
 1. Launch the application
