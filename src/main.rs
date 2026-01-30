@@ -288,7 +288,7 @@ impl eframe::App for OxyonApp {
 fn main() -> eframe::Result {
     let _ = modules::binaries::extraire_deps();
     let mut options = eframe::NativeOptions::default();
-    let icon_bytes = include_bytes!("../oxyon_icon.ico");
+    let icon_bytes = include_bytes!("../assets/oxyon_icon.ico");
     if let Ok(icon_data) = image::load_from_memory(icon_bytes) {
         let icon_rgba = icon_data.to_rgba8();
         let (width, height) = icon_rgba.dimensions();

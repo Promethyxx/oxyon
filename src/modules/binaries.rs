@@ -5,7 +5,7 @@ pub fn extraire_deps() -> Result<(), String> {
     }
 
     // On extrait un par un au lieu de faire un gros tableau global
-    let mut f = |name: &str, bytes: &[u8]| -> Result<(), String> {
+    let f = |name: &str, bytes: &[u8]| -> Result<(), String> {
         let path = temp_dir.join(name);
         if !path.exists() {
             std::fs::write(path, bytes).map_err(|e| e.to_string())?;
