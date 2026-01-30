@@ -8,11 +8,6 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 use which::which;
 
-/// Vérifie si mkvpropedit est disponible
-pub fn check_mkvpropedit() -> bool {
-    which("mkvpropedit").is_ok()
-}
-
 /// Lit un fichier NFO et retourne un HashMap (API quick-xml fixée)
 pub fn lire_nfo(nfo_path: &Path) -> Result<HashMap<String, String>, String> {
     let file = File::open(nfo_path).map_err(|e| e.to_string())?;
@@ -103,10 +98,7 @@ pub fn modifier_tag(mkv_path: &Path, tag: &str, valeur: &str) -> Result<(), Stri
 
 /// 3. Injection de tags dans une vidéo depuis un NFO
 pub fn appliquer_tags(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
-    if !check_mkvpropedit() {
-        return Err("mkvpropedit non trouvé".into());
-    }
-    let tags = lire_nfo(nfo_path)?;
+        let tags = lire_nfo(nfo_path)?;
     let mut args = vec![
         mkv_path.to_string_lossy().to_string(),
         "--edit".to_string(),

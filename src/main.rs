@@ -59,7 +59,14 @@ impl Default for OxyonApp {
 impl OxyonApp {
     fn verifier_deps(&mut self) {
         let mut m = Vec::new();
-        for (c, a) in [("7z", "i"), ("ffmpeg", "-version"), ("pandoc", "--version")] {
+        // Ajout de mkvmerge et exiftool à la liste
+        for (c, a) in [
+            ("7z", "i"), 
+            ("ffmpeg", "-version"), 
+            ("pandoc", "--version"),
+            ("mkvmerge", "--version"),
+            ("exiftool", "-ver")
+        ] {
             if std::process::Command::new(c)
                 .arg(a)
                 .stdout(std::process::Stdio::null())
@@ -73,7 +80,8 @@ impl OxyonApp {
         self.deps_manquantes = m;
     }
 
-    fn lancer_action(&mut self, input: PathBuf) {
+
+fn lancer_action(&mut self, input: PathBuf) {
         let output = input.parent().unwrap().join(format!(
             "{}_oxyon.{}",
             input.file_stem().unwrap_or_default().to_string_lossy(),
@@ -86,25 +94,25 @@ impl OxyonApp {
         let copie = self.copie_flux;
         *self.status.lock().unwrap() = "🚀 Action en cours...".into();
 
-        if module == ModuleType::Video || module == ModuleType::Audio {
-            if let Ok(c) =
-                modules::video::traiter_video(&input, &out_str, copie, module == ModuleType::Audio)
-            {
-                self.process = Some(c);
+        match module {
+            ModuleType::Video => {
+                if let Ok(c) = modules::video::traiter_video(&input, &out_str, copie, false) {
+                    self.process = Some(c);
+                }
             }
-        } else {
-            std::thread::spawn(move || match module {
-                ModuleType::Archive => {
-                    let _ = modules::archive::compresser(&input, &out_str, &fmt);
+            ModuleType::Audio => {
+                if let Ok(c) = modules::audio::convertir(&input, &out_str, "192k") {
+                    self.process = Some(c);
                 }
-                ModuleType::Doc => {
-                    let _ = modules::doc::convertir(&input, &out_str);
-                }
-                ModuleType::Image => {
-                    let _ = modules::image::compresser(&input, &out_str, ratio);
-                }
-                _ => {}
-            });
+            }
+            _ => {
+                std::thread::spawn(move || match module {
+                    ModuleType::Archive => { let _ = modules::archive::compresser(&input, &out_str, &fmt); }
+                    ModuleType::Doc => { let _ = modules::doc::convertir(&input, &out_str); }
+                    ModuleType::Image => { let _ = modules::image::compresser(&input, &out_str, ratio); }
+                    _ => {}
+                });
+            }
         }
     }
 }
@@ -186,13 +194,24 @@ impl eframe::App for OxyonApp {
                             ui.horizontal(|ui| { ui.label("Découpage (Mo) :"); ui.text_edit_singleline(&mut self.taille_vol); });
                         },
                         ModuleType::Audio => {
-                            ui.horizontal(|ui| {
-                                ui.label("Format :");
-                                egui::ComboBox::from_id_salt("afmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
-                                    for f in ["aac","flac","mp3","ogg","wav"] { ui.selectable_value(&mut self.format_choisi, f.into(), f); }
-                                });
-                            });
-                        },
+    ui.horizontal(|ui| {
+        ui.label("Format :");
+        egui::ComboBox::from_id_salt("afmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
+            for f in ["aac","flac","mp3","ogg","wav"] { ui.selectable_value(&mut self.format_choisi, f.into(), f); }
+        });
+    });
+
+    // AJOUT : Bouton d'extraction sous les options de conversion
+    if ui.button("🎵 Extraire Original (Auto)").clicked() {
+        for p in self.current_files.clone() {
+            let ext = modules::audio::detecter_extension(&p);
+            let out = p.with_extension(format!("extracted.{}", ext));
+            if let Ok(c) = modules::audio::extraire(&p, out.to_str().unwrap()) {
+                self.process = Some(c);
+            }
+        }
+    }
+},
                         ModuleType::Doc => {
                             ui.horizontal(|ui| {
                                 ui.label("Format :");

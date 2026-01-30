@@ -3,140 +3,51 @@ use std::process::Command;
 
 /// Conversion & Compression
 /// bitrate : ex "128k", "192k", "320k"
-pub fn convertir(input: &Path, output: &str, bitrate: &str) -> bool {
-    let status = Command::new("ffmpeg")
+pub fn convertir(input: &Path, output: &str, bitrate: &str) -> std::io::Result<std::process::Child> {
+    std::process::Command::new("ffmpeg")
         .arg("-i")
-        .arg(input.to_str().unwrap())
+        .arg(input)
         .arg("-b:a")
         .arg(bitrate)
         .arg(output)
         .arg("-y")
-        .status();
-
-    status.map(|s| s.success()).unwrap_or(false)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
 }
 
-/// Division : Coupe un extrait (Format "00:00:00")
-pub fn diviser(input: &Path, output: &str, debut: &str, duree: &str) -> bool {
-    let status = Command::new("ffmpeg")
-        .arg("-ss")
-        .arg(debut)
-        .arg("-t")
-        .arg(duree)
-        .arg("-i")
-        .arg(input.to_str().unwrap())
-        .arg("-acodec")
-        .arg("copy")
-        .arg(output)
-        .arg("-y")
-        .status();
+///Détecter le codec
+pub fn detecter_extension(input: &Path) -> String {
+    let output = std::process::Command::new("ffprobe")
+        .args([
+            "-v", "error",
+            "-select_streams", "a:0",
+            "-show_entries", "stream=codec_name",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+        ])
+        .arg(input)
+        .output()
+        .expect("Échec ffprobe");
 
-    status.map(|s| s.success()).unwrap_or(false)
+    let codec = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    
+    // Correction pour les extensions communes
+    match codec.as_str() {
+        "vorbis" => "ogg".into(),
+        "opus" => "opus".into(),
+        _ => codec,
+    }
 }
 
 /// Extraction : Récupère l'audio d'une vidéo
-pub fn extraire(input: &Path, output: &str) -> bool {
-    let status = Command::new("ffmpeg")
+pub fn extraire(input: &Path, output: &str) -> std::io::Result<std::process::Child> {
+    std::process::Command::new("ffmpeg")
         .arg("-i")
-        .arg(input.to_str().unwrap())
+        .arg(input)
         .arg("-vn")
-        .arg("-acodec")
+        .arg("-c:a") // Plus moderne que -acodec
         .arg("copy")
-        .arg(output)
         .arg("-y")
-        .status();
-
-    status.map(|s| s.success()).unwrap_or(false)
-}
-
-/// Fusion : Combine plusieurs fichiers via un fichier liste.txt
-pub fn fusionner(liste_txt: &str, output: &str) -> bool {
-    let status = Command::new("ffmpeg")
-        .arg("-f")
-        .arg("concat")
-        .arg("-safe")
-        .arg("0")
-        .arg("-i")
-        .arg(liste_txt)
-        .arg("-c")
-        .arg("copy")
         .arg(output)
-        .arg("-y")
-        .status();
-
-    status.map(|s| s.success()).unwrap_or(false)
-}
-
-/// Tag : Ajoute une pochette (Poster)
-pub fn ajouter_poster(musique: &Path, image: &Path, output: &str) -> bool {
-    let status = Command::new("ffmpeg")
-        .arg("-i")
-        .arg(musique.to_str().unwrap())
-        .arg("-i")
-        .arg(image.to_str().unwrap())
-        .arg("-map")
-        .arg("0:0")
-        .arg("-map")
-        .arg("1:0")
-        .arg("-c")
-        .arg("copy")
-        .arg("-id3v2_version")
-        .arg("3")
-        .arg(output)
-        .arg("-y")
-        .status();
-
-    status.map(|s| s.success()).unwrap_or(false)
-}
-
-/// Tag : Modifie Titre, Artiste, Album
-pub fn modifier_tags(input: &Path, output: &str, artiste: &str, titre: &str, album: &str) -> bool {
-    let status = Command::new("ffmpeg")
-        .arg("-i")
-        .arg(input.to_str().unwrap())
-        .arg("-metadata")
-        .arg(format!("artist={}", artiste))
-        .arg("-metadata")
-        .arg(format!("title={}", titre))
-        .arg("-metadata")
-        .arg(format!("album={}", album))
-        .arg("-c")
-        .arg("copy")
-        .arg(output)
-        .arg("-y")
-        .status();
-
-    status.map(|s| s.success()).unwrap_or(false)
-}
-
-/// Tag : Supprime toutes les métadonnées
-pub fn supprimer_tags(input: &Path, output: &str) -> bool {
-    let status = Command::new("ffmpeg")
-        .arg("-i")
-        .arg(input.to_str().unwrap())
-        .arg("-map_metadata")
-        .arg("-1")
-        .arg("-c")
-        .arg("copy")
-        .arg(output)
-        .arg("-y")
-        .status();
-
-    status.map(|s| s.success()).unwrap_or(false)
-}
-
-/// Réparation : Tente de reconstruire un flux corrompu
-pub fn reparer(input: &Path, output: &str) -> bool {
-    let status = Command::new("ffmpeg")
-        .arg("-i")
-        .arg(input.to_str().unwrap())
-        .arg("-map")
-        .arg("0")
-        .arg("-c")
-        .arg("copy")
-        .arg(output)
-        .arg("-y")
-        .status();
-
-    status.map(|s| s.success()).unwrap_or(false)
+        .spawn() 
 }
