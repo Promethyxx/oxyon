@@ -6,7 +6,6 @@ use std::process::Command;
 
 use quick_xml::Reader;
 use quick_xml::events::Event;
-use which::which;
 
 /// Lit un fichier NFO et retourne un HashMap (API quick-xml fixée)
 pub fn lire_nfo(nfo_path: &Path) -> Result<HashMap<String, String>, String> {

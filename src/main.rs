@@ -194,24 +194,24 @@ impl eframe::App for OxyonApp {
                             ui.horizontal(|ui| { ui.label("Découpage (Mo) :"); ui.text_edit_singleline(&mut self.taille_vol); });
                         },
                         ModuleType::Audio => {
-    ui.horizontal(|ui| {
-        ui.label("Format :");
-        egui::ComboBox::from_id_salt("afmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
-            for f in ["aac","flac","mp3","ogg","wav"] { ui.selectable_value(&mut self.format_choisi, f.into(), f); }
-        });
-    });
+                            ui.horizontal(|ui| {
+                                ui.label("Format :");
+                                egui::ComboBox::from_id_salt("afmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
+                                    for f in ["aac","flac","mp3","ogg","wav"] { ui.selectable_value(&mut self.format_choisi, f.into(), f); }
+                                });
+                            });
 
-    // AJOUT : Bouton d'extraction sous les options de conversion
-    if ui.button("🎵 Extraire Original (Auto)").clicked() {
-        for p in self.current_files.clone() {
-            let ext = modules::audio::detecter_extension(&p);
-            let out = p.with_extension(format!("extracted.{}", ext));
-            if let Ok(c) = modules::audio::extraire(&p, out.to_str().unwrap()) {
-                self.process = Some(c);
-            }
-        }
-    }
-},
+                            // AJOUT : Bouton d'extraction sous les options de conversion
+                            if ui.button("🎵 Extraire Original (Auto)").clicked() {
+                                for p in self.current_files.clone() {
+                                    let ext = modules::audio::detecter_extension(&p);
+                                    let out = p.with_extension(format!("extracted.{}", ext));
+                                    if let Ok(c) = modules::audio::extraire(&p, out.to_str().unwrap()) {
+                                        self.process = Some(c);
+                                    }
+                                }
+                            }
+                        },
                         ModuleType::Doc => {
                             ui.horizontal(|ui| {
                                 ui.label("Format :");
@@ -276,15 +276,32 @@ impl eframe::App for OxyonApp {
                         },
                         ModuleType::Tag => {
                             ui.vertical(|ui| {
-                                if ui.button("✅ Marquer VU").clicked() { let _ = modules::tag::marquer_vu(&path, &path.with_extension("nfo")); }
-                                if ui.button("🗑️ Reset Tags").clicked() { let _ = modules::tag::supprimer_tous_tags(&path); }
+                                if ui.button("✅ Marquer VU").clicked() {
+                                    let _ = modules::tag::marquer_vu(&path, &path.with_extension("nfo"));
+                                }
+
+                                if ui.button("📥 Injecter tags depuis NFO").clicked() {
+                                    let _ = modules::tag::appliquer_tags(&path, &path.with_extension("nfo"));
+                                }
+
+                                if ui.button("🖼️ Ajouter poster / fanart").clicked() {
+                                    let _ = modules::tag::ajouter_images_mkv(&path);
+                                }
+
+                                if ui.button("🗑️ Reset Tags").clicked() {
+                                    let _ = modules::tag::supprimer_tous_tags(&path);
+                                }
+
                                 ui.horizontal(|ui| {
                                     ui.text_edit_singleline(&mut self.tag_edit_val);
-                                    if ui.button("Modifier Titre").clicked() { let _ = modules::tag::modifier_tag(&path, "title", &self.tag_edit_val); }
+                                    if ui.button("✏️ Modifier Titre").clicked() {
+                                        let _ = modules::tag::modifier_tag(&path, "title", &self.tag_edit_val);
+                                    }
                                 });
                             });
                         },
                     }
+
 
                     if self.module_actif != ModuleType::Scrapper && self.module_actif != ModuleType::Tag {
                         ui.separator();
