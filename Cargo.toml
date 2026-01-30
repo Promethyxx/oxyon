@@ -19,9 +19,12 @@ toml = "0.8"
 which = "8.0.0"
 
 [build-dependencies]
-embed-resource = "2.4"
+winres = "0.1"
 
 [profile.release]
 opt-level = 0
 lto = false
 codegen-units = 256 # Maximum de parallélisation
+
+[alias]
+release-signed = "build --release"
