@@ -65,6 +65,7 @@ impl OxyonApp {
             ("ffmpeg", "-version"), 
             ("pandoc", "--version"),
             ("mkvmerge", "--version"),
+			("mkvpropedit", "--version"),
             ("exiftool", "-ver")
         ] {
             if std::process::Command::new(c)
