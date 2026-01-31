@@ -170,29 +170,3 @@ pub fn supprimer_tous_tags(mkv_path: &Path) -> Result<(), String> {
         Err("Erreur suppression tags".into())
     }
 }
-
-// Utilitaires de compatibilité existants
-pub fn incrementer_playcount_et_watched(nfo_path: &Path) -> Result<(), String> {
-    let mut data = lire_nfo(nfo_path)?;
-    let pc = data
-        .get("playcount")
-        .and_then(|v| v.parse::<u32>().ok())
-        .unwrap_or(0)
-        + 1;
-    data.insert("playcount".into(), pc.to_string());
-    data.insert("watched".into(), "1".into());
-    let mut file = File::create(nfo_path).map_err(|e| e.to_string())?;
-    writeln!(file, "<movie>").map_err(|e| e.to_string())?;
-    for (k, v) in data {
-        writeln!(file, "  <{0}>{1}</{0}>", k, v).map_err(|e| e.to_string())?;
-    }
-    writeln!(file, "</movie>").map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-pub fn traiter_mkv_complet(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
-    appliquer_tags(mkv_path, nfo_path)?;
-    ajouter_images_mkv(mkv_path)?;
-    incrementer_playcount_et_watched(nfo_path)?;
-    Ok(())
-}

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
+
 // Helper pour l'échappement XML
 fn escape_xml(text: &str) -> String {
     text.replace('&', "&amp;")
@@ -13,6 +14,7 @@ fn escape_xml(text: &str) -> String {
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
 }
+
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct ScrapeResult {
     pub id: i64,
@@ -32,6 +34,7 @@ pub struct ScrapeResult {
     pub tagline: String,
     pub imdb_id: Option<String>,
 }
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Actor {
     pub name: String,
@@ -39,6 +42,7 @@ pub struct Actor {
     pub thumb: Option<String>,
     pub id: i64,
 }
+
 pub fn download_image_bytes(poster_path: &str) -> Option<Vec<u8>> {
     let url = format!("https://image.tmdb.org/t/p/w92{}", poster_path);
     let client = Client::new();
@@ -49,8 +53,10 @@ pub fn download_image_bytes(poster_path: &str) -> Option<Vec<u8>> {
     }
     None
 }
+
 pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, is_series: bool) {
-    let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let _ = dotenvy::dotenv();
+	let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let year = data
         .release_date
         .split('-')
@@ -142,10 +148,8 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, is_series: bool) {
     xml.push_str(&format!("</{}>\n", tag));
     let _ = fs::write(input_path.with_extension("nfo"), xml);
 
-    // Téléchargement des images
     let client = Client::new();
 
-    // Poster
     if let Some(ref path) = data.poster_path {
         let poster_url = format!("https://image.tmdb.org/t/p/original{}", path);
         let out_path = parent_dir.join(format!("{}-poster.jpg", base_name));
@@ -159,7 +163,6 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, is_series: bool) {
         });
     }
 
-    // Fanart (backdrop)
     if let Some(ref path) = data.backdrop_path {
         let fanart_url = format!("https://image.tmdb.org/t/p/original{}", path);
         let out_path = parent_dir.join(format!("{}-fanart.jpg", base_name));
@@ -173,19 +176,17 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, is_series: bool) {
         });
     }
 
-    // ClearLogo depuis Fanart.tv
+    // Gestion de la clé Fanart sans panic
+    let fanart_api_key = match std::env::var("FANART_KEY") {
+        Ok(k) => k,
+        Err(_) => return,
+    };
+
     let tmdb_id = data.id;
-    let fanart_api_key = std::env::var("FANART_KEY").expect("FANART_KEY missing");
     let logo_url = if is_series {
-        format!(
-            "https://webservice.fanart.tv/v3/tv/{}?api_key={}",
-            tmdb_id, fanart_api_key
-        )
+        format!("https://webservice.fanart.tv/v3/tv/{}?api_key={}", tmdb_id, fanart_api_key)
     } else {
-        format!(
-            "https://webservice.fanart.tv/v3/movies/{}?api_key={}",
-            tmdb_id, fanart_api_key
-        )
+        format!("https://webservice.fanart.tv/v3/movies/{}?api_key={}", tmdb_id, fanart_api_key)
     };
 
     let out_logo_path = parent_dir.join(format!("{}-clearlogo.png", base_name));
@@ -217,14 +218,16 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, is_series: bool) {
         }
     });
 }
+
 pub fn search_tmdb(query: &str, is_series: bool) -> Result<Vec<ScrapeResult>, String> {
-    let api_key = std::env::var("TMDB_KEY").expect("TMDB_KEY missing");
+	let _ = dotenvy::dotenv();
+    let api_key = std::env::var("TMDB_KEY").map_err(|_| "TMDB_KEY manquante".to_string())?;
+
     let client = Client::builder()
         .user_agent("OXYON/2.1")
         .build()
         .map_err(|e| e.to_string())?;
 
-    // Nettoyage simplifié pour la recherche
     let re_year = Regex::new(r"\b(19|20)\d{2}\b").unwrap();
     let clean_query = re_year
         .replace_all(query, "")
@@ -232,11 +235,13 @@ pub fn search_tmdb(query: &str, is_series: bool) -> Result<Vec<ScrapeResult>, St
         .replace(".", " ")
         .replace("_", " ")
         .replace("-", " ");
+
     let url = if is_series {
         "https://api.themoviedb.org/3/search/tv"
     } else {
         "https://api.themoviedb.org/3/search/movie"
     };
+
     let res = client
         .get(url)
         .query(&[
@@ -248,17 +253,14 @@ pub fn search_tmdb(query: &str, is_series: bool) -> Result<Vec<ScrapeResult>, St
         .map_err(|e| e.to_string())?
         .json::<Value>()
         .map_err(|e| e.to_string())?;
+
     let mut list = Vec::new();
     if let Some(results) = res["results"].as_array() {
         for r in results {
             let id = r["id"].as_i64().unwrap_or(0);
             let detail_url = format!(
                 "https://api.themoviedb.org/3/{}?api_key={}&language=fr-FR&append_to_response=credits,external_ids",
-                if is_series {
-                    format!("tv/{}", id)
-                } else {
-                    format!("movie/{}", id)
-                },
+                if is_series { format!("tv/{}", id) } else { format!("movie/{}", id) },
                 api_key
             );
 
@@ -267,9 +269,7 @@ pub fn search_tmdb(query: &str, is_series: bool) -> Result<Vec<ScrapeResult>, St
                 .send()
                 .and_then(|resp| resp.json::<Value>())
             {
-                // Mapping des acteurs, réalisateurs, runtime
                 let imdb_id = d["external_ids"]["imdb_id"].as_str().map(|s| s.to_string());
-
                 let mut actors = Vec::new();
                 if let Some(cast) = d["credits"]["cast"].as_array() {
                     for a in cast.iter().take(15) {
@@ -308,45 +308,18 @@ pub fn search_tmdb(query: &str, is_series: bool) -> Result<Vec<ScrapeResult>, St
                 };
                 list.push(ScrapeResult {
                     id,
-                    title: d[if is_series { "name" } else { "title" }]
-                        .as_str()
-                        .unwrap_or("Inconnu")
-                        .to_string(),
-                    original_title: d[if is_series {
-                        "original_name"
-                    } else {
-                        "original_title"
-                    }]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string(),
+                    title: d[if is_series { "name" } else { "title" }].as_str().unwrap_or("Inconnu").to_string(),
+                    original_title: d[if is_series { "original_name" } else { "original_title" }].as_str().unwrap_or("").to_string(),
                     overview: d["overview"].as_str().unwrap_or("").to_string(),
                     poster_path: d["poster_path"].as_str().map(|s| s.to_string()),
                     backdrop_path: d["backdrop_path"].as_str().map(|s| s.to_string()),
-                    release_date: d[if is_series {
-                        "first_air_date"
-                    } else {
-                        "release_date"
-                    }]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string(),
+                    release_date: d[if is_series { "first_air_date" } else { "release_date" }].as_str().unwrap_or("").to_string(),
                     vote_average: d["vote_average"].as_f64().unwrap_or(0.0),
                     vote_count: d["vote_count"].as_u64().unwrap_or(0),
                     runtime: runtime as u32,
                     tagline: d["tagline"].as_str().unwrap_or("").to_string(),
-                    genres: d["genres"]
-                        .as_array()
-                        .unwrap_or(&vec![])
-                        .iter()
-                        .map(|g| g["name"].as_str().unwrap_or("").to_string())
-                        .collect(),
-                    studios: d["production_companies"]
-                        .as_array()
-                        .unwrap_or(&vec![])
-                        .iter()
-                        .map(|s| s["name"].as_str().unwrap_or("").to_string())
-                        .collect(),
+                    genres: d["genres"].as_array().unwrap_or(&vec![]).iter().map(|g| g["name"].as_str().unwrap_or("").to_string()).collect(),
+                    studios: d["production_companies"].as_array().unwrap_or(&vec![]).iter().map(|s| s["name"].as_str().unwrap_or("").to_string()).collect(),
                     actors,
                     director,
                     imdb_id,
