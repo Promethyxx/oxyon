@@ -14,24 +14,39 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
     
-    - name: Create bin directory
-      run: mkdir -p bin
-      shell: bash
-    
     - name: Download binaries from latest release
       run: |
-        gh release download latest --pattern "*.exe" --dir bin --repo ${{ github.repository }}
+        New-Item -ItemType Directory -Force -Path bin
+        
+        try {
+          gh release download latest -p "ffmpeg.exe" -p "ffplay.exe" -p "ffprobe.exe" -p "mkvmerge.exe" -p "mkvpropedit.exe" -p "7za.exe" -p "pandoc.exe" -p "exiftool.exe" --dir bin --repo ${{ github.repository }}
+          Write-Host "✓ Binaries downloaded successfully"
+        } catch {
+          Write-Host "✗ Failed to download binaries from release"
+          Write-Host "Please create a release with the required .exe files"
+          exit 1
+        }
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      continue-on-error: true
+      shell: pwsh
     
-    - name: Check if binaries exist
+    - name: Verify binaries
       run: |
-        if (Test-Path "bin\ffmpeg.exe") {
-          Write-Host "Binaries found - will build with embedded binaries"
-        } else {
-          Write-Host "No binaries found - build may fail if binaries are required"
+        $requiredFiles = @("ffmpeg.exe", "ffplay.exe", "ffprobe.exe", "mkvmerge.exe", "mkvpropedit.exe", "7za.exe", "pandoc.exe", "exiftool.exe")
+        $missing = @()
+        
+        foreach ($file in $requiredFiles) {
+          if (-not (Test-Path "bin\$file")) {
+            $missing += $file
+          }
         }
+        
+        if ($missing.Count -gt 0) {
+          Write-Host "✗ Missing binaries: $($missing -join ', ')"
+          exit 1
+        }
+        
+        Write-Host "✓ All required binaries present"
       shell: pwsh
     
     - name: Build
