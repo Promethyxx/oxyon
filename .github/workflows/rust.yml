@@ -5,6 +5,10 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Nécessaire pour que le jeton puisse lire les releases
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: windows-latest
@@ -16,11 +20,13 @@ jobs:
     
     - name: Download binaries from release to bin/
       run: |
-        gh release download latest --pattern "*.exe" --dir . --repo ${{ github.repository }}
+        # Créer le dossier bin d'abord
         New-Item -ItemType Directory -Force -Path bin
-        Get-ChildItem -Path . -Filter "*.exe" -Recurse | Move-Item -Destination bin/ -Force
+        # Télécharger directement dans bin
+        # Si 'latest' échoue, vérifiez qu'une release non-draft existe.
+        gh release download --pattern "*.exe" --dir bin --repo ${{ github.repository }}
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: pwsh
     
     - name: Build
