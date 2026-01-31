@@ -17,9 +17,11 @@ jobs:
     - name: Download binaries from release to bin/
       run: |
         mkdir bin
-        gh release download latest --pattern "*.exe" --dir bin --repo ${{ github.repository }}
+        gh release download latest --pattern "*.exe" --repo ${{ github.repository }}
+        Move-Item -Path *.exe -Destination bin/
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: pwsh
     
     - name: Build
       run: cargo build --verbose
