@@ -14,40 +14,12 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
     
-    - name: Download binaries from latest release
+    - name: Download binaries from release to bin/
       run: |
-        New-Item -ItemType Directory -Force -Path bin
-        
-        try {
-          gh release download latest -p "ffmpeg.exe" -p "ffplay.exe" -p "ffprobe.exe" -p "mkvmerge.exe" -p "mkvpropedit.exe" -p "7za.exe" -p "pandoc.exe" -p "exiftool.exe" --dir bin --repo ${{ github.repository }}
-          Write-Host "✓ Binaries downloaded successfully"
-        } catch {
-          Write-Host "✗ Failed to download binaries from release"
-          Write-Host "Please create a release with the required .exe files"
-          exit 1
-        }
+        mkdir bin
+        gh release download latest --pattern "*.exe" --dir bin --repo ${{ github.repository }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      shell: pwsh
-    
-    - name: Verify binaries
-      run: |
-        $requiredFiles = @("ffmpeg.exe", "ffplay.exe", "ffprobe.exe", "mkvmerge.exe", "mkvpropedit.exe", "7za.exe", "pandoc.exe", "exiftool.exe")
-        $missing = @()
-        
-        foreach ($file in $requiredFiles) {
-          if (-not (Test-Path "bin\$file")) {
-            $missing += $file
-          }
-        }
-        
-        if ($missing.Count -gt 0) {
-          Write-Host "✗ Missing binaries: $($missing -join ', ')"
-          exit 1
-        }
-        
-        Write-Host "✓ All required binaries present"
-      shell: pwsh
     
     - name: Build
       run: cargo build --verbose
