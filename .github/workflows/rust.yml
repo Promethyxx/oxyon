@@ -16,9 +16,9 @@ jobs:
     
     - name: Download binaries from release to bin/
       run: |
-        mkdir bin
-        gh release download latest --pattern "*.exe" --repo ${{ github.repository }}
-        Move-Item -Path *.exe -Destination bin/
+        gh release download latest --pattern "*.exe" --dir . --repo ${{ github.repository }}
+        New-Item -ItemType Directory -Force -Path bin
+        Get-ChildItem -Path . -Filter "*.exe" -Recurse | Move-Item -Destination bin/ -Force
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: pwsh
