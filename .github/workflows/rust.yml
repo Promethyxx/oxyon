@@ -1,5 +1,4 @@
 name: Rust CI
-
 on:
   push:
     branches: [ "main" ]
@@ -9,15 +8,34 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
     - uses: actions/checkout@v4
-
+    
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
-
+    
+    - name: Create bin directory
+      run: mkdir -p bin
+      shell: bash
+    
+    - name: Download binaries from latest release
+      run: |
+        gh release download latest --pattern "*.exe" --dir bin --repo ${{ github.repository }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      continue-on-error: true
+    
+    - name: Check if binaries exist
+      run: |
+        if (Test-Path "bin\ffmpeg.exe") {
+          Write-Host "Binaries found - will build with embedded binaries"
+        } else {
+          Write-Host "No binaries found - build may fail if binaries are required"
+        }
+      shell: pwsh
+    
     - name: Build
       run: cargo build --verbose
-
+    
     - name: Check Warnings
       run: cargo check --all-targets -- -D warnings

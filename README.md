@@ -18,8 +18,6 @@ Oxyon provides an easy-to-use GUI interface for major file processing libraries
 - **MKVToolNix** – MKV file creation and manipulation
 - **Pandoc** – Universal document converter
 
-## ✨ Features
-
 ### 🔁 File Conversion
 - 🎬 **Video Conversion**: Convert between common video formats (MP4, MKV, AVI, etc.)
 - 🎵 **Audio Processing**: Extract, convert, and process audio tracks
@@ -38,16 +36,6 @@ Oxyon provides an easy-to-use GUI interface for major file processing libraries
 - 🧭 **Unified GUI**: One consistent interface for all tools
 - ⚙️ **Tool Abstraction**: Powerful CLI tools without command-line complexity
 
-## 📋 Prerequisites
-
-Before installing Oxyon, ensure you have the following tools installed and accessible in your system PATH:
-
-- [7-Zip](https://www.7-zip.org/) or [p7zip](https://p7zip.sourceforge.net/) (for archives)
-- [ExifTool](https://exiftool.org/) (for metadata)
-- [FFmpeg](https://ffmpeg.org/) (for audio/video)
-- [MKVToolNix](https://mkvtoolnix.download/) (for MKV files)
-- [Pandoc](https://pandoc.org/) (for documents)
-- [Rust](https://www.rust-lang.org/tools/install) (1.70 or later)
 
 ### Verify Installation
 
@@ -56,6 +44,7 @@ Before installing Oxyon, ensure you have the following tools installed and acces
 exiftool -ver
 ffmpeg -version
 mkvmerge --version
+mkvpropedit --version
 pandoc --version
 ```
 
@@ -70,13 +59,13 @@ cd oxyon
 
 2. **Set up API keys** (optional, for media metadata features)
 
-Create a `key.env` file in the root directory:
+Create a `.env` file in the root directory:
 
 ```bash
-cp example.env key.env
+cp example.env .env
 ```
 
-Then edit `key.env` and add your API keys:
+Then edit `.env` and add your API keys:
 
 ```env
 TMDB_KEY=your_tmdb_api_key_here
@@ -130,57 +119,6 @@ Or on Windows:
 ### Video
 ![Video Module](screenshots/Video.png)
 
-## 💻 Usage
-
-1. Launch the application
-2. Select your input file(s)
-3. Choose the desired output format
-4. Configure conversion settings (optional)
-5. Click "Convert" and wait for the process to complete
-
-### 🎬 Typical Workflow
-
-1. Load a movie or TV episode
-2. Fetch metadata from TMDB
-3. Automatically tag the file (title, year, artwork)
-4. Convert or remux if needed
-5. Export a clean, ready-to-archive media file
-
-### Example Use Cases
-
-- **Convert video to MP4**: Load a video file, select MP4 output, adjust quality settings
-- **Extract audio from video**: Choose audio-only output format (MP3, FLAC, etc.)
-- **Edit photo metadata**: Load images and modify EXIF data
-- **Create archives**: Bundle files into compressed archives
-- **Convert documents**: Transform Markdown to PDF, DOCX to HTML, etc.
-
-## 🏗️ Project Structure
-
-```
-oxyon/
-├── src/                 # Source code
-├── Cargo.toml           # Rust dependencies
-├── build.rs             # Build script
-├── oxyon_config.toml    # Configuration file
-├── oxyon_icon.ico       # Application icon
-├── oxyon_logo.png       # Project logo
-├── example.env          # Example environment variables
-└── README.md            # This file
-```
-
-## 🛠️ Configuration
-
-Edit `oxyon_config.toml` to customize:
-
-- Default output directories
-- Quality presets
-- UI preferences
-- Tool-specific settings
-
-## 🐛 Known Issues
-
-Check the [Issues](https://github.com/Promethyxx/oxyon/issues) page for current bugs and feature requests.
-
 ## 🗺️ Roadmap (planned)
 
 The features are actively planned and tracked via GitHub issues.
@@ -192,22 +130,3 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 ## 📝 License
 
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE.txt](LICENSE.txt) file for details.
-
-## 🙏 Acknowledgments
-
-This project wouldn't be possible without these amazing open-source tools:
-
-- [7-Zip](https://www.7-zip.org/) by Igor Pavlov
-- [ExifTool](https://exiftool.org/) by Phil Harvey
-- [FFmpeg](https://ffmpeg.org/) by FFmpeg team
-- [MKVToolNix](https://mkvtoolnix.download/) by Moritz Bunkus
-- [Pandoc](https://pandoc.org/) by John MacFarlane
-
-## 📧 Contact
-
-- GitHub: [@Promethyxx](https://github.com/Promethyxx)
-- Project Link: [https://github.com/Promethyxx/oxyon](https://github.com/Promethyxx/oxyon)
-
----
-
-**Made with ❤️ and Rust**
