@@ -296,23 +296,39 @@ impl eframe::App for OxyonApp {
                     }
                 },
                 ModuleType::Tag => {
-                                        let path_opt = self.current_files.get(0).cloned();
-                    ui.vertical(|ui| {
-                        if let Some(path) = path_opt {
-                            if ui.button("✅ Marquer VU").clicked() { let _ = modules::tag::marquer_vu(&path, &path.with_extension("nfo")); }
-                            if ui.button("📥 Injecter tags depuis NFO").clicked() { let _ = modules::tag::appliquer_tags(&path, &path.with_extension("nfo")); }
-                            if ui.button("🖼️ Ajouter poster / fanart").clicked() { let _ = modules::tag::ajouter_images_mkv(&path); }
-                            if ui.button("🗑️ Reset Tags").clicked() { let _ = modules::tag::supprimer_tous_tags(&path); }
-                            ui.horizontal(|ui| {
-                                ui.text_edit_singleline(&mut self.tag_edit_val);
-                                if ui.button("✏️ Modifier Titre").clicked() { let _ = modules::tag::modifier_tag(&path, "title", &self.tag_edit_val); }
-                            });
-                        } else {
-                                                        ui.label("⚠️ Aucun fichier chargé pour appliquer les actions Tag");
-                        }
-                    });
-                },
+    let path_opt = self.current_files.get(0).cloned();
+    ui.vertical(|ui| {
+        if ui.button("✅ Marquer VU").clicked() { 
+            if let Some(path) = &path_opt {
+                let _ = modules::tag::marquer_vu(&path, &path.with_extension("nfo")); 
             }
+        }
+        if ui.button("📥 Injecter tags depuis NFO").clicked() { 
+            if let Some(path) = &path_opt {
+                let _ = modules::tag::appliquer_tags(&path, &path.with_extension("nfo")); 
+            }
+        }
+        if ui.button("🖼️ Ajouter poster / fanart").clicked() { 
+            if let Some(path) = &path_opt {
+                let _ = modules::tag::ajouter_images_mkv(&path); 
+            }
+        }
+        if ui.button("🗑️ Reset Tags").clicked() { 
+            if let Some(path) = &path_opt {
+                let _ = modules::tag::supprimer_tous_tags(&path); 
+            }
+        }
+        ui.horizontal(|ui| {
+            ui.text_edit_singleline(&mut self.tag_edit_val);
+            if ui.button("✏️ Modifier Titre").clicked() { 
+                if let Some(path) = &path_opt {
+                    let _ = modules::tag::modifier_tag(&path, "title", &self.tag_edit_val); 
+                }
+            }
+        });
+    });
+},
+}
 
             // Actions globales si fichiers présents et module actif non Scrapper/Tag
             if !self.current_files.is_empty() && self.module_actif != ModuleType::Scrapper && self.module_actif != ModuleType::Tag {
