@@ -58,27 +58,8 @@ impl Default for OxyonApp {
 
 impl OxyonApp {
     fn verifier_deps(&mut self) {
-        let mut m = Vec::new();
-        // Ajout de mkvmerge et exiftool à la liste
-        for (c, a) in [
-            ("7z", "i"), 
-            ("ffmpeg", "-version"), 
-            ("pandoc", "--version"),
-            ("mkvmerge", "--version"),
-			("mkvpropedit", "--version"),
-            ("exiftool", "-ver")
-        ] {
-            if std::process::Command::new(c)
-                .arg(a)
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .status()
-                .is_err()
-            {
-                m.push(c.into());
-            }
-        }
-        self.deps_manquantes = m;
+        // Les binaires sont embarqués, plus besoin de vérifier le PATH
+        self.deps_manquantes = Vec::new();
     }
 
 
