@@ -20,7 +20,7 @@ enum ModuleType {
     Scrapper,
     Tag,
     Video,
-    Settings, // Ajouté
+    Settings,
 }
 
 struct OxyonApp {
@@ -36,7 +36,7 @@ struct OxyonApp {
     taille_vol: String,
     deps_manquantes: Vec<String>,
     tag_edit_val: String,
-    current_theme: String, // Ajouté
+    current_theme: String,
 }
 
 impl Default for OxyonApp {
@@ -54,13 +54,12 @@ impl Default for OxyonApp {
             taille_vol: "".into(),
             deps_manquantes: Vec::new(),
             tag_edit_val: String::new(),
-            current_theme: "Auto".into(), // Ajouté
+            current_theme: "Auto".into(),
         }
     }
 }
 
 impl OxyonApp {
-    // Fonctions de config ajoutées
     fn load_config(&mut self) {
         if let Ok(c) = std::fs::read_to_string("config.toml") {
             if let Ok(parsed) = c.parse::<toml::Table>() {
@@ -126,7 +125,9 @@ impl OxyonApp {
 
 impl eframe::App for OxyonApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if self.deps_manquantes.is_empty() && ctx.cumulative_pass_nr() == 0 {
+        if ctx.cumulative_pass_nr() == 0 {
+            self.load_config();
+            self.apply_theme(ctx);
             self.verifier_deps();
         }
 
@@ -167,7 +168,7 @@ impl eframe::App for OxyonApp {
                     (ModuleType::Scrapper, "🔍 Scrapper"),
                     (ModuleType::Tag, "🏷️ Tag"),
                     (ModuleType::Video, "🎬 Vidéo"),
-                    (ModuleType::Settings, "⚙ Paramètres"), // Ajouté
+                    (ModuleType::Settings, "⚙ Paramètres"),
                 ];
                 for (m, txt) in mods {
                     if ui.selectable_value(&mut self.module_actif, m, txt).clicked() {
@@ -263,7 +264,6 @@ impl eframe::App for OxyonApp {
                                 }
                             });
                         }
-                        if ui.button("📺 Série").clicked() { }
                     });
                     let entries = self.results_ui.lock().unwrap().clone();
                     for entry in entries {
