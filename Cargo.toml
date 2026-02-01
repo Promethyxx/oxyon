@@ -1,6 +1,6 @@
 [package]
 name = "oxyon"
-version = "0.1.3"
+version = "1.0.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 
@@ -26,3 +26,4 @@ winres = "0.1"
 opt-level = 0
 lto = false
 codegen-units = 256 # Maximum de parallélisation
+strip = true  # Réduit la taille de l'exe
