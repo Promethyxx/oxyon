@@ -368,9 +368,14 @@ fn main() -> eframe::Result {
             height,
         }));
     }
-    eframe::run_native(
+    let result = eframe::run_native(
         "OXYON Multi-Tool",
         options,
         Box::new(|_cc| Ok(Box::new(OxyonApp::default()))),
-    )
+    );
+    
+    // Nettoyer les fichiers temporaires à la fermeture
+    modules::binaries::cleanup();
+    
+    result
 }

@@ -41,9 +41,7 @@ Oxyon provides an easy-to-use GUI interface for major file processing libraries
 
 ```bash
 7z --help
-exiftool -ver
 ffmpeg -version
-mkvmerge --version
 mkvpropedit --version
 pandoc --version
 ```

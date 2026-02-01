@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use std::path::PathBuf;
 use std::process::{Child, Command};
+use crate::modules::binaries;
 
 /// Convertit ou change le conteneur d'une vidéo
 pub fn traiter_video(
@@ -24,12 +25,12 @@ pub fn traiter_video(
 
     args.extend(vec!["-y", output]);
 
-    Command::new("ffmpeg").args(&args).spawn()
+    Command::new(binaries::get_ffmpeg()).args(&args).spawn()
 }
 
 /// Analyse le codec audio d'un fichier via ffprobe
 pub fn extraire_nom_codec(input: &PathBuf) -> String {
-    let out = Command::new("ffprobe")
+    let out = Command::new(binaries::get_ffprobe())
         .args(&[
             "-v",
             "error",

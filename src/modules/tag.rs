@@ -5,6 +5,7 @@ use std::path::Path;
 use std::process::Command;
 use quick_xml::Reader;
 use quick_xml::events::Event;
+use crate::modules::binaries;
 
 /// Lit un fichier NFO et retourne un HashMap
 pub fn lire_nfo(nfo_path: &Path) -> Result<HashMap<String, String>, String> {
@@ -78,7 +79,7 @@ pub fn marquer_vu(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
     let temp_xml = "temp_vu.xml";
     std::fs::write(temp_xml, xml_content).map_err(|e| e.to_string())?;
 
-    let status = Command::new("mkvpropedit")
+    let status = Command::new(binaries::get_mkvpropedit())
         .args([mkv_path.to_str().unwrap(), "--tags", &format!("global:{}", temp_xml)])
         .status().map_err(|e| e.to_string())?;
 
@@ -88,7 +89,7 @@ pub fn marquer_vu(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
 
 /// 2. Modification directe (Demandée par ton main.rs)
 pub fn modifier_tag(mkv_path: &Path, tag: &str, valeur: &str) -> Result<(), String> {
-    let status = Command::new("mkvpropedit")
+    let status = Command::new(binaries::get_mkvpropedit())
         .args([
             mkv_path.to_str().unwrap(),
             "--edit", "info",
@@ -112,7 +113,7 @@ pub fn appliquer_tags(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
     let temp_xml = "temp_meta.xml";
     std::fs::write(temp_xml, xml_content).map_err(|e| e.to_string())?;
 
-    let status = Command::new("mkvpropedit")
+    let status = Command::new(binaries::get_mkvpropedit())
         .args([mkv_path.to_str().unwrap(), "--tags", &format!("global:{}", temp_xml)])
         .status().map_err(|e| e.to_string())?;
 
@@ -124,7 +125,7 @@ pub fn appliquer_tags(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
 pub fn ajouter_images_mkv(mkv_path: &Path) -> Result<(), String> {
     let parent = mkv_path.parent().ok_or("Dossier parent introuvable")?;
     let stem_mkv = mkv_path.file_stem().unwrap().to_string_lossy().to_lowercase();
-    let mut command = Command::new("mkvpropedit");
+    let mut command = Command::new(binaries::get_mkvpropedit());
     command.arg(mkv_path);
 
     let mut found = false;
@@ -158,7 +159,7 @@ pub fn supprimer_tous_tags(mkv_path: &Path) -> Result<(), String> {
     std::fs::write(temp_xml, xml_vide).map_err(|e| e.to_string())?;
 
     // 2. On injecte le vide + reset du titre et des images
-    let status = Command::new("mkvpropedit")
+    let status = Command::new(binaries::get_mkvpropedit())
         .args([
             mkv_path.to_str().unwrap(),
             "--tags", &format!("global:{}", temp_xml),

@@ -1,9 +1,10 @@
 use std::path::Path;
+use crate::modules::binaries;
 
 /// Conversion & Compression
 /// bitrate : ex "128k", "192k", "320k"
 pub fn convertir(input: &Path, output: &str, bitrate: &str) -> std::io::Result<std::process::Child> {
-    std::process::Command::new("ffmpeg")
+    std::process::Command::new(binaries::get_ffmpeg())
         .arg("-i")
         .arg(input)
         .arg("-b:a")
@@ -17,7 +18,7 @@ pub fn convertir(input: &Path, output: &str, bitrate: &str) -> std::io::Result<s
 
 ///Détecter le codec
 pub fn detecter_extension(input: &Path) -> String {
-    let output = std::process::Command::new("ffprobe")
+    let output = std::process::Command::new(binaries::get_ffprobe())
         .args([
             "-v", "error",
             "-select_streams", "a:0",
@@ -40,7 +41,7 @@ pub fn detecter_extension(input: &Path) -> String {
 
 /// Extraction : Récupère l'audio d'une vidéo
 pub fn extraire(input: &Path, output: &str) -> std::io::Result<std::process::Child> {
-    std::process::Command::new("ffmpeg")
+    std::process::Command::new(binaries::get_ffmpeg())
         .arg("-i")
         .arg(input)
         .arg("-vn")
