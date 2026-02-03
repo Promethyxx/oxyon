@@ -40,7 +40,5 @@ jobs:
       with:
         tag_name: latest
         files: target/debug/*.exe
-        bin/*.exe
-        !bin/oxyon.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
