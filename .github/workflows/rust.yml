@@ -34,11 +34,24 @@ jobs:
         RUSTFLAGS: "-D warnings"
       run: cargo check --all-targets
 
+    - name: Cleanup old oxyon
+      run: |
+        if (Test-Path bin/oxyon.exe) { Remove-Item bin/oxyon.exe }
+      shell: pwsh
+
     - name: Deploy Rolling Release
       uses: softprops/action-gh-release@v2
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       with:
         tag_name: latest
+        body: |
+          ### Outils inclus (Assets)
+          - FFmpeg / FFprobe : [8.0.2]
+          - 7-Zip (7za) : [25.1]
+          - Pandoc : [3.8.3]
+          - Mkvpropedit : [97.0]
+          
+          *Dernière mise à jour automatique le ${{ github.event.head_commit.timestamp }}*
         files: |
           target/debug/oxyon.exe
           bin/*.exe
