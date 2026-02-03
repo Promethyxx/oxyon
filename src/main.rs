@@ -70,7 +70,7 @@ impl Default for OxyonApp {
             taille_vol: "".into(),
             deps_manquantes: Vec::new(),
             tag_edit_val: String::new(),
-            current_theme: "Auto".into(),
+            current_theme: "Dark".into(),
         }
     }
 }
@@ -82,12 +82,28 @@ impl OxyonApp {
                 if let Some(theme) = parsed.get("display").and_then(|d| d.get("theme")).and_then(|t| t.as_str()) {
                     self.current_theme = theme.to_string();
                 }
-                if let Some(settings) = parsed.get("settings") {
-                    if let Some(fmt) = settings.get("last_format").and_then(|f| f.as_str()) {
+
+                let section = match self.module_actif {
+                    ModuleType::Archive => "archive",
+                    ModuleType::Audio => "audio",
+                    ModuleType::Image => "image",
+                    ModuleType::Video => "video",
+                    _ => "",
+                };
+
+                if let Some(s) = parsed.get(section) {
+                    if let Some(fmt) = s.get("format").and_then(|f| f.as_str()) {
                         self.format_choisi = fmt.to_string();
                     }
-                    if let Some(ratio) = settings.get("ratio_img").and_then(|r| r.as_integer()) {
-                        self.ratio_img = ratio as u32;
+                    if section == "image" {
+                        if let Some(ratio) = s.get("ratio_img").and_then(|r| r.as_integer()) {
+                            self.ratio_img = ratio as u32;
+                        }
+                    }
+                    if section == "video" {
+                        if let Some(cf) = s.get("copie_flux").and_then(|v| v.as_bool()) {
+                            self.copie_flux = cf;
+                        }
                     }
                 }
             }
@@ -95,13 +111,26 @@ impl OxyonApp {
     }
 
     fn save_config(&self) {
-        let content = format!(
-            "[display]\ntheme = \"{}\"\n\n[settings]\nlast_format = \"{}\"\nratio_img = {}\n", 
-            self.current_theme, 
-            self.format_choisi, 
-            self.ratio_img
-        );
-        let _ = std::fs::write("config.toml", content);
+        let mut toml = String::new();
+
+        toml.push_str("[archive]\n");
+        toml.push_str(&format!("format = \"{}\"\n\n", if self.module_actif == ModuleType::Archive { &self.format_choisi } else { "7z" }));
+
+        toml.push_str("[audio]\n");
+        toml.push_str(&format!("format = \"{}\"\n\n", if self.module_actif == ModuleType::Audio { &self.format_choisi } else { "aac" }));
+
+        toml.push_str("[display]\n");
+        toml.push_str(&format!("theme = \"{}\"\n\n", self.current_theme));
+
+        toml.push_str("[image]\n");
+        toml.push_str(&format!("format = \"{}\"\n", if self.module_actif == ModuleType::Image { &self.format_choisi } else { "PNG" }));
+        toml.push_str(&format!("ratio_img = {}\n\n", self.ratio_img));
+
+        toml.push_str("[video]\n");
+        toml.push_str(&format!("copie_flux = {}\n", self.copie_flux));
+        toml.push_str(&format!("format = \"{}\"\n", if self.module_actif == ModuleType::Video { &self.format_choisi } else { "mkv" }));
+
+        let _ = std::fs::write("config.toml", toml);
     }
 
     fn apply_theme(&self, ctx: &egui::Context) {
@@ -161,6 +190,8 @@ impl OxyonApp {
                     if !success {
                         log_error(&format!("Erreur Module {:?} sur {:?}", module, input));
                         *status_arc.lock().unwrap() = "❌ Erreur (voir log)".into();
+                    } else {
+                        *status_arc.lock().unwrap() = "✅ Terminé".into();
                     }
                 });
             }
@@ -217,16 +248,7 @@ impl eframe::App for OxyonApp {
                 ];
                 for (m, txt) in mods {
                     if ui.selectable_value(&mut self.module_actif, m, txt).clicked() {
-                        self.format_choisi = match m {
-                            ModuleType::Archive => "7z".into(),
-                            ModuleType::Audio => "aac".into(),
-                            ModuleType::Doc => "csv".into(),
-                            ModuleType::Image => "GIF".into(),
-                            ModuleType::Scrapper => "nfo".into(),
-                            ModuleType::Tag => "mkv".into(),
-                            ModuleType::Video => "avi".into(),
-                            _ => self.format_choisi.clone(),
-                        };
+                        self.load_config();
                     }
                 }
             });
@@ -238,7 +260,9 @@ impl eframe::App for OxyonApp {
                     ui.horizontal(|ui| {
                         ui.label("Format :");
                         egui::ComboBox::from_id_salt("arfmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
-                            for f in ["7z", "tar", "zip"] { ui.selectable_value(&mut self.format_choisi, f.into(), f); }
+                            for f in ["7z", "tar", "zip"] { 
+                                if ui.selectable_value(&mut self.format_choisi, f.into(), f).changed() { self.save_config(); }
+                            }
                         });
                     });
                     ui.horizontal(|ui| { ui.label("Découpage (Mo) :"); ui.text_edit_singleline(&mut self.taille_vol); });
@@ -247,7 +271,9 @@ impl eframe::App for OxyonApp {
                     ui.horizontal(|ui| {
                         ui.label("Format :");
                         egui::ComboBox::from_id_salt("afmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
-                            for f in ["aac","flac","mp3","ogg","wav"] { ui.selectable_value(&mut self.format_choisi, f.into(), f); }
+                            for f in ["aac","flac","mp3","ogg","wav"] { 
+                                if ui.selectable_value(&mut self.format_choisi, f.into(), f).changed() { self.save_config(); }
+                            }
                         });
                     });
                     if ui.button("🎵 Extraire Original (Auto)").clicked() {
@@ -270,17 +296,21 @@ impl eframe::App for OxyonApp {
                     ui.horizontal(|ui| {
                         ui.label("Format :");
                         egui::ComboBox::from_id_salt("ifmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
-                            for f in ["GIF","JPG","PNG","WebP"] { ui.selectable_value(&mut self.format_choisi, f.into(), f); }
+                            for f in ["GIF","JPG","PNG","WebP"] { 
+                                if ui.selectable_value(&mut self.format_choisi, f.into(), f).changed() { self.save_config(); }
+                            }
                         });
                     });
-                    ui.add(egui::Slider::new(&mut self.ratio_img, 1..=10).text("Qualité"));
+                    if ui.add(egui::Slider::new(&mut self.ratio_img, 1..=10).text("Qualité")).changed() { self.save_config(); }
                 },
                 ModuleType::Video => {
                     ui.horizontal(|ui| {
                         egui::ComboBox::from_id_salt("vfmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
-                            for f in ["mkv","mp4","webm"] { ui.selectable_value(&mut self.format_choisi, f.into(), f); }
+                            for f in ["mkv","mp4","webm"] { 
+                                if ui.selectable_value(&mut self.format_choisi, f.into(), f).changed() { self.save_config(); }
+                            }
                         });
-                        ui.checkbox(&mut self.copie_flux, "Copie flux");
+                        if ui.checkbox(&mut self.copie_flux, "Copie flux").changed() { self.save_config(); }
                     });
                 },
                 ModuleType::Scrapper => {
