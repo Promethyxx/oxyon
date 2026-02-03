@@ -21,6 +21,7 @@ fn log_error(message: &str) {
     }
 }
 
+#[cfg(feature = "api")]
 #[derive(Clone)]
 struct ScrapeEntry {
     data: modules::scrap::ScrapeResult,
@@ -29,17 +30,23 @@ struct ScrapeEntry {
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 enum ModuleType {
+    #[cfg(feature = "api")]
     Archive,
+    #[cfg(feature = "api")]
     Audio,
     Doc,
     Image,
+    #[cfg(feature = "api")]
     Scrapper,
+    #[cfg(feature = "api")]
     Tag,
+    #[cfg(feature = "api")]
     Video,
     Settings,
 }
 
 struct OxyonApp {
+    #[cfg(feature = "api")]
     copie_flux: bool,
     current_files: Vec<PathBuf>,
     current_stem: String,
@@ -47,10 +54,13 @@ struct OxyonApp {
     module_actif: ModuleType,
     process: Option<std::process::Child>,
     ratio_img: u32,
+    #[cfg(feature = "api")]
     results_ui: Arc<Mutex<Vec<ScrapeEntry>>>,
     status: Arc<Mutex<String>>,
+    #[cfg(feature = "api")]
     taille_vol: String,
     deps_manquantes: Vec<String>,
+    #[cfg(feature = "api")]
     tag_edit_val: String,
     current_theme: String,
 }
@@ -58,17 +68,21 @@ struct OxyonApp {
 impl Default for OxyonApp {
     fn default() -> Self {
         Self {
+            #[cfg(feature = "api")]
             copie_flux: false,
             current_files: Vec::new(),
             current_stem: String::new(),
             format_choisi: "mp4".into(),
-            module_actif: ModuleType::Video,
+            module_actif: ModuleType::Image,
             process: None,
             ratio_img: 2,
+            #[cfg(feature = "api")]
             results_ui: Arc::new(Mutex::new(Vec::new())),
             status: Arc::new(Mutex::new("Déposez des fichiers".into())),
+            #[cfg(feature = "api")]
             taille_vol: "".into(),
             deps_manquantes: Vec::new(),
+            #[cfg(feature = "api")]
             tag_edit_val: String::new(),
             current_theme: "Dark".into(),
         }
@@ -77,47 +91,62 @@ impl Default for OxyonApp {
 
 impl OxyonApp {
     fn load_config(&mut self) {
-        if let Ok(c) = std::fs::read_to_string("config.toml") {
-            if let Ok(parsed) = c.parse::<toml::Table>() {
-                if let Some(theme) = parsed.get("display").and_then(|d| d.get("theme")).and_then(|t| t.as_str()) {
-                    self.current_theme = theme.to_string();
-                }
+    // 1. Reset systématique : On définit le défaut AVANT de lire le fichier
+    match self.module_actif {
+        ModuleType::Image => self.format_choisi = "PNG".into(),
+        ModuleType::Doc => self.format_choisi = "pdf".into(),
+        #[cfg(feature = "api")]
+        ModuleType::Video => self.format_choisi = "mkv".into(),
+        #[cfg(feature = "api")]
+        ModuleType::Audio => self.format_choisi = "mp3".into(),
+        #[cfg(feature = "api")]
+        ModuleType::Archive => self.format_choisi = "7z".into(),
+        _ => (),
+    }
 
-                let section = match self.module_actif {
-                    ModuleType::Archive => "archive",
-                    ModuleType::Audio => "audio",
-                    ModuleType::Image => "image",
-                    ModuleType::Video => "video",
-                    _ => "",
-                };
+    // 2. Lecture du fichier : Si la section existe, elle écrase le défaut ci-dessus
+    if let Ok(c) = std::fs::read_to_string("config.toml") {
+        if let Ok(parsed) = c.parse::<toml::Table>() {
+            if let Some(theme) = parsed.get("display").and_then(|d| d.get("theme")).and_then(|t| t.as_str()) {
+                self.current_theme = theme.to_string();
+            }
 
-                if let Some(s) = parsed.get(section) {
-                    if let Some(fmt) = s.get("format").and_then(|f| f.as_str()) {
-                        self.format_choisi = fmt.to_string();
-                    }
-                    if section == "image" {
-                        if let Some(ratio) = s.get("ratio_img").and_then(|r| r.as_integer()) {
-                            self.ratio_img = ratio as u32;
-                        }
-                    }
-                    if section == "video" {
-                        if let Some(cf) = s.get("copie_flux").and_then(|v| v.as_bool()) {
-                            self.copie_flux = cf;
-                        }
-                    }
+            let section = match self.module_actif {
+                ModuleType::Image => "image",
+                ModuleType::Doc => "doc",
+                #[cfg(feature = "api")]
+                ModuleType::Archive => "archive",
+                #[cfg(feature = "api")]
+                ModuleType::Audio => "audio",
+                #[cfg(feature = "api")]
+                ModuleType::Video => "video",
+                _ => "",
+            };
+
+            if let Some(s) = parsed.get(section) {
+                if let Some(fmt) = s.get("format").and_then(|f| f.as_str()) {
+                    self.format_choisi = fmt.to_string(); // Ici, mkv sera chargé pour la vidéo
                 }
+                // ... reste du code (ratio_img, copie_flux)
             }
         }
     }
+}
 
     fn save_config(&self) {
         let mut toml = String::new();
 
         toml.push_str("[archive]\n");
+        #[cfg(feature = "api")]
         toml.push_str(&format!("format = \"{}\"\n\n", if self.module_actif == ModuleType::Archive { &self.format_choisi } else { "7z" }));
+        #[cfg(not(feature = "api"))]
+        toml.push_str("format = \"7z\"\n\n");
 
         toml.push_str("[audio]\n");
+        #[cfg(feature = "api")]
         toml.push_str(&format!("format = \"{}\"\n\n", if self.module_actif == ModuleType::Audio { &self.format_choisi } else { "aac" }));
+        #[cfg(not(feature = "api"))]
+        toml.push_str("format = \"aac\"\n\n");
 
         toml.push_str("[display]\n");
         toml.push_str(&format!("theme = \"{}\"\n\n", self.current_theme));
@@ -127,8 +156,16 @@ impl OxyonApp {
         toml.push_str(&format!("ratio_img = {}\n\n", self.ratio_img));
 
         toml.push_str("[video]\n");
-        toml.push_str(&format!("copie_flux = {}\n", self.copie_flux));
-        toml.push_str(&format!("format = \"{}\"\n", if self.module_actif == ModuleType::Video { &self.format_choisi } else { "mkv" }));
+        #[cfg(feature = "api")]
+        {
+            toml.push_str(&format!("copie_flux = {}\n", self.copie_flux));
+            toml.push_str(&format!("format = \"{}\"\n", if self.module_actif == ModuleType::Video { &self.format_choisi } else { "mkv" }));
+        }
+        #[cfg(not(feature = "api"))]
+        {
+            toml.push_str("copie_flux = false\n");
+            toml.push_str("format = \"mkv\"\n");
+        }
 
         let _ = std::fs::write("config.toml", toml);
     }
@@ -155,11 +192,14 @@ impl OxyonApp {
         let module = self.module_actif;
         let fmt = self.format_choisi.clone();
         let ratio = self.ratio_img;
+        #[cfg(feature = "api")]
         let copie = self.copie_flux;
+        
         let status_arc = Arc::clone(&self.status);
         *self.status.lock().unwrap() = "🚀 Action en cours...".into();
 
         match module {
+            #[cfg(feature = "api")]
             ModuleType::Video => {
                 match modules::video::traiter_video(&input, &out_str, copie, false) {
                     Ok(c) => self.process = Some(c),
@@ -169,6 +209,7 @@ impl OxyonApp {
                     }
                 }
             }
+            #[cfg(feature = "api")]
             ModuleType::Audio => {
                 match modules::audio::convertir(&input, &out_str, "192k") {
                     Ok(c) => self.process = Some(c),
@@ -181,6 +222,7 @@ impl OxyonApp {
             _ => {
                 std::thread::spawn(move || {
                     let success = match module {
+                        #[cfg(feature = "api")]
                         ModuleType::Archive => modules::archive::compresser(&input, &out_str, &fmt),
                         ModuleType::Doc => modules::doc::convertir(&input, &out_str),
                         ModuleType::Image => modules::image::compresser(&input, &out_str, ratio),
@@ -213,6 +255,7 @@ impl eframe::App for OxyonApp {
                 if let Some(p) = self.current_files.first() {
                     self.current_stem = p.file_stem().unwrap_or_default().to_string_lossy().to_string();
                 }
+                #[cfg(feature = "api")]
                 self.results_ui.lock().unwrap().clear();
                 *self.status.lock().unwrap() = format!("📁 {} fichiers chargés", self.current_files.len());
             }
@@ -236,16 +279,16 @@ impl eframe::App for OxyonApp {
             ui.separator();
 
             ui.horizontal_wrapped(|ui| {
-                let mods = vec![
-                    (ModuleType::Archive, "📦 Archive"),
-                    (ModuleType::Audio, "🎵 Audio"),
-                    (ModuleType::Doc, "📄 Doc"),
-                    (ModuleType::Image, "🖼️ Image"),
-                    (ModuleType::Scrapper, "🔍 Scrapper"),
-                    (ModuleType::Tag, "🏷️ Tag"),
-                    (ModuleType::Video, "🎬 Vidéo"),
-                    (ModuleType::Settings, "⚙ Paramètres"),
-                ];
+                let mut mods = vec![];
+                #[cfg(feature = "api")] mods.push((ModuleType::Archive, "📦 Archive"));
+                #[cfg(feature = "api")] mods.push((ModuleType::Audio, "🎵 Audio"));
+                mods.push((ModuleType::Doc, "📄 Doc"));
+                mods.push((ModuleType::Image, "🖼️ Image"));
+                #[cfg(feature = "api")] mods.push((ModuleType::Scrapper, "🔍 Scrapper"));
+                #[cfg(feature = "api")] mods.push((ModuleType::Tag, "🏷️ Tag"));
+                #[cfg(feature = "api")] mods.push((ModuleType::Video, "🎬 Vidéo"));
+                mods.push((ModuleType::Settings, "⚙ Paramètres"));
+                
                 for (m, txt) in mods {
                     if ui.selectable_value(&mut self.module_actif, m, txt).clicked() {
                         self.load_config();
@@ -256,6 +299,7 @@ impl eframe::App for OxyonApp {
             ui.separator();
 
             match self.module_actif {
+                #[cfg(feature = "api")]
                 ModuleType::Archive => {
                     ui.horizontal(|ui| {
                         ui.label("Format :");
@@ -267,6 +311,7 @@ impl eframe::App for OxyonApp {
                     });
                     ui.horizontal(|ui| { ui.label("Découpage (Mo) :"); ui.text_edit_singleline(&mut self.taille_vol); });
                 },
+                #[cfg(feature = "api")]
                 ModuleType::Audio => {
                     ui.horizontal(|ui| {
                         ui.label("Format :");
@@ -303,6 +348,7 @@ impl eframe::App for OxyonApp {
                     });
                     if ui.add(egui::Slider::new(&mut self.ratio_img, 1..=10).text("Qualité")).changed() { self.save_config(); }
                 },
+                #[cfg(feature = "api")]
                 ModuleType::Video => {
                     ui.horizontal(|ui| {
                         egui::ComboBox::from_id_salt("vfmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
@@ -313,6 +359,7 @@ impl eframe::App for OxyonApp {
                         if ui.checkbox(&mut self.copie_flux, "Copie flux").changed() { self.save_config(); }
                     });
                 },
+                #[cfg(feature = "api")]
                 ModuleType::Scrapper => {
                     ui.horizontal(|ui| {
                         if ui.button("🎬 Film").clicked() {
@@ -351,6 +398,7 @@ impl eframe::App for OxyonApp {
                         });
                     }
                 },
+                #[cfg(feature = "api")]
                 ModuleType::Tag => {
                     let path_opt = self.current_files.get(0).cloned();
                     ui.vertical(|ui| {
@@ -384,7 +432,11 @@ impl eframe::App for OxyonApp {
                 },
             }
 
-            if !self.current_files.is_empty() && self.module_actif != ModuleType::Scrapper && self.module_actif != ModuleType::Tag && self.module_actif != ModuleType::Settings {
+            let mut hide_exec = self.module_actif == ModuleType::Settings;
+            #[cfg(feature = "api")]
+            { hide_exec = hide_exec || self.module_actif == ModuleType::Scrapper || self.module_actif == ModuleType::Tag; }
+
+            if !self.current_files.is_empty() && !hide_exec {
                 ui.separator();
                 if ui.button("🔥 EXÉCUTER TOUT").clicked() { for p in self.current_files.clone() { self.lancer_action(p); } }
             }

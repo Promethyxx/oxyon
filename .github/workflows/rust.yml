@@ -26,25 +26,50 @@ jobs:
       shell: pwsh
       continue-on-error: true
     
-    - name: Build
-      run: cargo build --verbose
-    
+    # NETTOYAGE INTÉGRAL DES ANCIENNES VERSIONS
+    - name: Cleanup old versions
+      run: |
+        $old_files = @("bin/oxyon.exe", "bin/oxyon-full.exe", "bin/oxyon-office.exe", "oxyon-full.exe", "oxyon-office.exe")
+        foreach ($f in $old_files) {
+          if (Test-Path $f) { 
+            Remove-Item $f -Force
+            Write-Host "Nettoyé : $f"
+          }
+        }
+      shell: pwsh
+
+    # 1. BUILD VERSION COMPLÈTE
+    - name: Build Full Version
+      run: cargo build --release --verbose
+
+    - name: Prepare Full Binary
+      run: Copy-Item target/release/oxyon.exe oxyon-full.exe
+      shell: pwsh
+
+    # 2. BUILD VERSION OFFICE (MINIMALE)
+    - name: Build Office Version
+      run: cargo build --release --no-default-features --verbose
+
+    - name: Prepare Office Binary
+      run: Copy-Item target/release/oxyon.exe oxyon-office.exe
+      shell: pwsh
+
     - name: Check Warnings
       env:
         RUSTFLAGS: "-D warnings"
       run: cargo check --all-targets
 
-    - name: Cleanup old oxyon
-      run: |
-        if (Test-Path bin/oxyon.exe) { Remove-Item bin/oxyon.exe }
-      shell: pwsh
-
+    # DÉPLOIEMENT
     - name: Deploy Rolling Release
       uses: softprops/action-gh-release@v2
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       with:
         tag_name: latest
         body: |
+          ### Versions disponibles
+          - **oxyon-full.exe** : Version complète (Scrap, Vidéo, Audio, Archive, Tag)
+          - **oxyon-office.exe** : Version "Office" (Uniquement Doc et Image)
+          
           ### Outils inclus (Assets)
           - FFmpeg / FFprobe : [8.0.2]
           - 7-Zip (7za) : [25.1]
@@ -53,7 +78,8 @@ jobs:
           
           *Dernière mise à jour automatique le ${{ github.event.head_commit.timestamp }}*
         files: |
-          target/debug/oxyon.exe
+          oxyon-full.exe
+          oxyon-office.exe
           bin/*.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
