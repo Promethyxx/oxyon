@@ -39,8 +39,6 @@ jobs:
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       with:
         tag_name: latest
-        files: |
-          target/debug/*.exe
-          bin/*.exe
+        files: target/debug/*.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
