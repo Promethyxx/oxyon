@@ -63,15 +63,30 @@ impl OxyonApp {
     fn load_config(&mut self) {
         if let Ok(c) = std::fs::read_to_string("config.toml") {
             if let Ok(parsed) = c.parse::<toml::Table>() {
+                // Chargement du thème
                 if let Some(theme) = parsed.get("display").and_then(|d| d.get("theme")).and_then(|t| t.as_str()) {
                     self.current_theme = theme.to_string();
+                }
+                // Chargement des paramètres de traitement
+                if let Some(settings) = parsed.get("settings") {
+                    if let Some(fmt) = settings.get("last_format").and_then(|f| f.as_str()) {
+                        self.format_choisi = fmt.to_string();
+                    }
+                    if let Some(ratio) = settings.get("ratio_img").and_then(|r| r.as_integer()) {
+                        self.ratio_img = ratio as u32;
+                    }
                 }
             }
         }
     }
 
     fn save_config(&self) {
-        let content = format!("[display]\ntheme = \"{}\"\n", self.current_theme);
+        let content = format!(
+            "[display]\ntheme = \"{}\"\n\n[settings]\nlast_format = \"{}\"\nratio_img = {}\n", 
+            self.current_theme, 
+            self.format_choisi, 
+            self.ratio_img
+        );
         let _ = std::fs::write("config.toml", content);
     }
 

@@ -48,24 +48,8 @@ cd oxyon
 
 2. **Set up API keys** (optional, for media metadata features)
 
-Create a `.env` file in the root directory:
-
-```bash
-cp example.env .env
-```
-
-Then edit `.env` and add your API keys:
-
-```env
-TMDB_KEY=your_tmdb_api_key_here
-FANART_KEY=your_fanart_api_key_here
-```
-
-**How to get API keys:**
 - TMDB: Register at [https://www.themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)
 - FanArt: Register at [https://fanart.tv/get-an-api-key/](https://fanart.tv/get-an-api-key/)
-
-> ⚠️ **Note**: API keys are only required if you want to use the media metadata features. Basic file conversion works without them.
 
 3. **Build the project**
 

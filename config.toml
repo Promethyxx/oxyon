@@ -1,2 +1,6 @@
 [display]
 theme = "Light"
+
+[settings]
+last_format = "7z"
+ratio_img = 2
