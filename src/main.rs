@@ -4,6 +4,22 @@ mod modules;
 use eframe::egui;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::fs::OpenOptions;
+use std::io::Write;
+
+// --- Système de Log ---
+fn log_error(message: &str) {
+    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
+    let log_line = format!("[{}] ERROR: {}\n", timestamp, message);
+
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("oxyon_errors.log") 
+    {
+        let _ = file.write_all(log_line.as_bytes());
+    }
+}
 
 #[derive(Clone)]
 struct ScrapeEntry {
@@ -11,7 +27,7 @@ struct ScrapeEntry {
     texture: Option<egui::TextureHandle>,
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 enum ModuleType {
     Archive,
     Audio,
@@ -63,11 +79,9 @@ impl OxyonApp {
     fn load_config(&mut self) {
         if let Ok(c) = std::fs::read_to_string("config.toml") {
             if let Ok(parsed) = c.parse::<toml::Table>() {
-                // Chargement du thème
                 if let Some(theme) = parsed.get("display").and_then(|d| d.get("theme")).and_then(|t| t.as_str()) {
                     self.current_theme = theme.to_string();
                 }
-                // Chargement des paramètres de traitement
                 if let Some(settings) = parsed.get("settings") {
                     if let Some(fmt) = settings.get("last_format").and_then(|f| f.as_str()) {
                         self.format_choisi = fmt.to_string();
@@ -113,25 +127,41 @@ impl OxyonApp {
         let fmt = self.format_choisi.clone();
         let ratio = self.ratio_img;
         let copie = self.copie_flux;
+        let status_arc = Arc::clone(&self.status);
         *self.status.lock().unwrap() = "🚀 Action en cours...".into();
 
         match module {
             ModuleType::Video => {
-                if let Ok(c) = modules::video::traiter_video(&input, &out_str, copie, false) {
-                    self.process = Some(c);
+                match modules::video::traiter_video(&input, &out_str, copie, false) {
+                    Ok(c) => self.process = Some(c),
+                    Err(e) => {
+                        log_error(&format!("Vidéo: {:?} sur {:?}", e, input));
+                        *self.status.lock().unwrap() = "❌ Erreur Vidéo (voir log)".into();
+                    }
                 }
             }
             ModuleType::Audio => {
-                if let Ok(c) = modules::audio::convertir(&input, &out_str, "192k") {
-                    self.process = Some(c);
+                match modules::audio::convertir(&input, &out_str, "192k") {
+                    Ok(c) => self.process = Some(c),
+                    Err(e) => {
+                        log_error(&format!("Audio: {:?} sur {:?}", e, input));
+                        *self.status.lock().unwrap() = "❌ Erreur Audio (voir log)".into();
+                    }
                 }
             }
             _ => {
-                std::thread::spawn(move || match module {
-                    ModuleType::Archive => { let _ = modules::archive::compresser(&input, &out_str, &fmt); }
-                    ModuleType::Doc => { let _ = modules::doc::convertir(&input, &out_str); }
-                    ModuleType::Image => { let _ = modules::image::compresser(&input, &out_str, ratio); }
-                    _ => {}
+                std::thread::spawn(move || {
+                    let success = match module {
+                        ModuleType::Archive => modules::archive::compresser(&input, &out_str, &fmt),
+                        ModuleType::Doc => modules::doc::convertir(&input, &out_str),
+                        ModuleType::Image => modules::image::compresser(&input, &out_str, ratio),
+                        _ => true,
+                    };
+
+                    if !success {
+                        log_error(&format!("Erreur Module {:?} sur {:?}", module, input));
+                        *status_arc.lock().unwrap() = "❌ Erreur (voir log)".into();
+                    }
                 });
             }
         }
@@ -166,7 +196,7 @@ impl eframe::App for OxyonApp {
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.vertical_centered(|ui| ui.heading("🚀 OXYON ALL-IN-ONE"));
+            ui.vertical_centered(|ui| ui.heading("OXYON"));
 
             if !self.deps_manquantes.is_empty() {
                 ui.colored_label(egui::Color32::RED, format!("⚠️ Manquant : {}", self.deps_manquantes.join(", ")));
@@ -348,7 +378,7 @@ fn main() -> eframe::Result {
     }
     
     let result = eframe::run_native(
-        "OXYON Multi-Tool",
+        "OXYON",
         options,
         Box::new(|cc| {
             let mut app = OxyonApp::default();
