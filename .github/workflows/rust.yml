@@ -1,15 +1,14 @@
-name: Rust CI
+name: Rust CI/CD
+
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 permissions:
-  contents: read
+  contents: write # Nécessaire pour mettre à jour la Release
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
@@ -17,18 +16,28 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
     
-    - name: Download binaries
+    - name: Download assets
       run: |
         New-Item -ItemType Directory -Force -Path bin
-        gh release download --pattern "*.exe" --dir bin --repo ${{ github.repository }}
+        gh release download latest --pattern "*.exe" --dir bin --repo ${{ github.repository }}
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: pwsh
-    
+      continue-on-error: true # Ne bloque pas si la release est vide au début
+
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --release --verbose # Build optimisé
     
     - name: Check Warnings
       env:
         RUSTFLAGS: "-D warnings"
       run: cargo check --all-targets
+
+    - name: Update Rolling Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: latest
+        name: "Dernière version (Auto)"
+        files: target/release/*.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
