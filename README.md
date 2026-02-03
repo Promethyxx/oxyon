@@ -1,12 +1,9 @@
-# Oxyon
+# Oxyon & Oxyon Office
 
-![Oxyon Logo](oxyon_logo.png)
+![Oxyon Logo](\assets\oxyon_logo.png)
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE.txt)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-
-**Oxyon** is a unified multimedia toolbox built in Rust:  
-file conversion, movie & TV scraping, and media tagging — all in one graphical interface.
 
 ## 🎯 Overview
 
@@ -35,62 +32,6 @@ Oxyon provides an easy-to-use GUI interface for major file processing libraries
 ### 🎨 Interface
 - 🧭 **Unified GUI**: One consistent interface for all tools
 - ⚙️ **Tool Abstraction**: Powerful CLI tools without command-line complexity
-
-
-## 🚀 Installation
-
-1. **Clone the repository**
-
-```bash
-git clone https://github.com/Promethyxx/oxyon.git
-cd oxyon
-```
-
-2. **Set up API keys** (optional, for media metadata features)
-
-- TMDB: Register at [https://www.themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)
-- FanArt: Register at [https://fanart.tv/get-an-api-key/](https://fanart.tv/get-an-api-key/)
-
-3. **Build the project**
-
-```bash
-cargo build --release
-```
-
-4. **Run Oxyon**
-
-```bash
-./target/release/oxyon
-```
-
-Or on Windows:
-
-```bash
-.\target\release\oxyon.exe
-```
-
-## 📸 Screenshots
-
-### Archive
-![Archive Module](assets\screenshots/Archive.png)
-
-### Audio
-![Audio Module](assets\screenshots/Audio.png)
-
-### Document
-![Document Module](assets\screenshots/Doc.png)
-
-### Image
-![Image Module](assets\screenshots/Image.png)
-
-### Scraping
-![Scraping Module](assets\screenshots/Scrap.png)
-
-### Media Tagging
-![Tagging Module](assets\screenshots/Tag.png)
-
-### Video
-![Video Module](assets\screenshots/Video.png)
 
 ## 🗺️ Roadmap (planned)
 

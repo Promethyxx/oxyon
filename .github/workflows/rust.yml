@@ -66,17 +66,17 @@ jobs:
       with:
         tag_name: latest
         body: |
-          ### Versions disponibles
-          - **oxyon-full.exe** : Version complète (Scrap, Vidéo, Audio, Archive, Tag)
-          - **oxyon-office.exe** : Version "Office" (Uniquement Doc et Image)
+          ### Available versions
+          - **oxyon-full.exe** : Complete version contains following modules: (Archives, Audio, Docs, Pictures, Scrap, Tag, Vidéo)
+          - **oxyon-office.exe** : Office version contains following modules: (Doc and Pictures)
           
-          ### Outils inclus (Assets)
+          ###Assets (You don't need this)
           - FFmpeg / FFprobe : [8.0.2]
           - 7-Zip (7za) : [25.1]
           - Pandoc : [3.8.3]
           - Mkvpropedit : [97.0]
           
-          *Dernière mise à jour automatique le ${{ github.event.head_commit.timestamp }}*
+          *Last update the ${{ github.event.head_commit.timestamp }}*
         files: |
           oxyon-full.exe
           oxyon-office.exe
