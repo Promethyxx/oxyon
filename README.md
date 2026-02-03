@@ -37,15 +37,6 @@ Oxyon provides an easy-to-use GUI interface for major file processing libraries
 - ⚙️ **Tool Abstraction**: Powerful CLI tools without command-line complexity
 
 
-### Verify Installation
-
-```bash
-7z --help
-ffmpeg -version
-mkvpropedit --version
-pandoc --version
-```
-
 ## 🚀 Installation
 
 1. **Clone the repository**
@@ -97,25 +88,25 @@ Or on Windows:
 ## 📸 Screenshots
 
 ### Archive
-![Archive Module](screenshots/Archive.png)
+![Archive Module](assets\screenshots/Archive.png)
 
 ### Audio
-![Audio Module](screenshots/Audio.png)
+![Audio Module](assets\screenshots/Audio.png)
 
 ### Document
-![Document Module](screenshots/Doc.png)
+![Document Module](assets\screenshots/Doc.png)
 
 ### Image
-![Image Module](screenshots/Image.png)
+![Image Module](assets\screenshots/Image.png)
 
 ### Scraping
-![Scraping Module](screenshots/Scrap.png)
+![Scraping Module](assets\screenshots/Scrap.png)
 
 ### Media Tagging
-![Tagging Module](screenshots/Tag.png)
+![Tagging Module](assets\screenshots/Tag.png)
 
 ### Video
-![Video Module](screenshots/Video.png)
+![Video Module](assets\screenshots/Video.png)
 
 ## 🗺️ Roadmap (planned)
 
