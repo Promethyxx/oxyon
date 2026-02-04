@@ -1,5 +1,5 @@
 [archive]
-format = "zip"
+format = "7z"
 
 [audio]
 format = "aac"
