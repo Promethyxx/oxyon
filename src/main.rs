@@ -71,6 +71,13 @@ struct OxyonApp {
     save_audio_format: bool,
     #[cfg(feature = "api")]
     save_video_format: bool,
+    // Options Image
+    image_action: String, // "convert", "rotate", "crop"
+    rotation_angle: u32,
+    crop_x: u32,
+    crop_y: u32,
+    crop_width: u32,
+    crop_height: u32,
 }
 
 impl Default for OxyonApp {
@@ -101,6 +108,12 @@ impl Default for OxyonApp {
             save_audio_format: false,
             #[cfg(feature = "api")]
             save_video_format: false,
+            image_action: "convert".into(),
+            rotation_angle: 90,
+            crop_x: 0,
+            crop_y: 0,
+            crop_width: 100,
+            crop_height: 100,
         }
     }
 }
@@ -313,6 +326,14 @@ impl OxyonApp {
         #[cfg(feature = "api")]
         let copie = self.copie_flux;
         
+        // Copier les paramètres Image
+        let img_action = self.image_action.clone();
+        let angle = self.rotation_angle;
+        let crop_x = self.crop_x;
+        let crop_y = self.crop_y;
+        let crop_w = self.crop_width;
+        let crop_h = self.crop_height;
+        
         let status_arc = Arc::clone(&self.status);
         *self.status.lock().unwrap() = "🚀 Action en cours...".into();
 
@@ -343,7 +364,14 @@ impl OxyonApp {
                         #[cfg(feature = "api")]
                         ModuleType::Archive => modules::archive::compresser(&input, &out_str, &fmt),
                         ModuleType::Doc => modules::doc::convertir(&input, &out_str),
-                        ModuleType::Image => modules::pic::compresser(&input, &out_str, ratio),
+                        ModuleType::Image => {
+                            match img_action.as_str() {
+                                "convert" => modules::pic::compresser(&input, &out_str, ratio),
+                                "rotate" => modules::pic::pivoter(&input, &out_str, angle),
+                                "crop" => modules::pic::recadrer(&input, &out_str, crop_x, crop_y, crop_w, crop_h),
+                                _ => modules::pic::compresser(&input, &out_str, ratio),
+                            }
+                        },
                         _ => true,
                     };
 
@@ -467,18 +495,63 @@ impl eframe::App for OxyonApp {
                     }
                 },
                 ModuleType::Image => {
+                    // Sélecteur d'action
                     ui.horizontal(|ui| {
-                        ui.label("Format :");
-                        egui::ComboBox::from_id_salt("ifmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
-                            for f in ["AVIF","DNG","EXR","GIF","HDR","HEIC","ICO","JPG","JXL","PNG","PSD","RAW","SVG","TIFF","WebP"] { 
-                                ui.selectable_value(&mut self.format_choisi, f.into(), f);
-                            }
+                        ui.label("Action :");
+                        egui::ComboBox::from_id_salt("img_action").selected_text(&self.image_action).show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.image_action, "convert".into(), "Convert/Resize");
+                            ui.selectable_value(&mut self.image_action, "rotate".into(), "Rotate");
+                            ui.selectable_value(&mut self.image_action, "crop".into(), "Crop");
                         });
                     });
-                    if ui.checkbox(&mut self.save_image_format, "💾 Sauvegarder ce format").changed() {
-                        self.save_config();
+                    
+                    ui.separator();
+                    
+                    // Options selon l'action choisie
+                    match self.image_action.as_str() {
+                        "convert" => {
+                            ui.horizontal(|ui| {
+                                ui.label("Format :");
+                                egui::ComboBox::from_id_salt("ifmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
+                                    for f in ["AVIF","DNG","EXR","GIF","HDR","HEIC","ICO","JPG","JXL","PNG","PSD","RAW","SVG","TIFF","WebP"] { 
+                                        ui.selectable_value(&mut self.format_choisi, f.into(), f);
+                                    }
+                                });
+                            });
+                            if ui.checkbox(&mut self.save_image_format, "💾 Sauvegarder ce format").changed() {
+                                self.save_config();
+                            }
+                            if ui.add(egui::Slider::new(&mut self.ratio_img, 1..=10).text("Qualité/Ratio")).changed() { 
+                                self.save_config(); 
+                            }
+                        },
+                        "rotate" => {
+                            ui.horizontal(|ui| {
+                                ui.label("Angle :");
+                                egui::ComboBox::from_id_salt("rot_angle").selected_text(format!("{}°", self.rotation_angle)).show_ui(ui, |ui| {
+                                    ui.selectable_value(&mut self.rotation_angle, 90, "90°");
+                                    ui.selectable_value(&mut self.rotation_angle, 180, "180°");
+                                    ui.selectable_value(&mut self.rotation_angle, 270, "270°");
+                                });
+                            });
+                        },
+                        "crop" => {
+                            ui.label("Coordonnées en % (0-100) :");
+                            ui.horizontal(|ui| {
+                                ui.label("X:");
+                                ui.add(egui::Slider::new(&mut self.crop_x, 0..=100));
+                                ui.label("Y:");
+                                ui.add(egui::Slider::new(&mut self.crop_y, 0..=100));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Largeur:");
+                                ui.add(egui::Slider::new(&mut self.crop_width, 1..=100));
+                                ui.label("Hauteur:");
+                                ui.add(egui::Slider::new(&mut self.crop_height, 1..=100));
+                            });
+                        },
+                        _ => {}
                     }
-                    if ui.add(egui::Slider::new(&mut self.ratio_img, 1..=10).text("Qualité")).changed() { self.save_config(); }
                 },
                 #[cfg(feature = "api")]
                 ModuleType::Video => {

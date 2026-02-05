@@ -135,6 +135,31 @@ pub fn pivoter(input: &Path, output: &str, angle: u32) -> bool {
     }
 }
 
+/// Recadrage d'image (crop) - coordonnées en pourcentage de l'image
+/// x, y = coin supérieur gauche (0-100)
+/// width, height = dimensions du crop (0-100)
+pub fn recadrer(input: &Path, output: &str, x_pct: u32, y_pct: u32, width_pct: u32, height_pct: u32) -> bool {
+    if let Ok(img) = image::open(input) {
+        let (img_w, img_h) = (img.width(), img.height());
+        
+        // Convertir pourcentages en pixels
+        let x = (img_w * x_pct) / 100;
+        let y = (img_h * y_pct) / 100;
+        let width = (img_w * width_pct) / 100;
+        let height = (img_h * height_pct) / 100;
+        
+        // Vérifier les limites
+        if x + width > img_w || y + height > img_h {
+            return false;
+        }
+        
+        let cropped = img.crop_imm(x, y, width, height);
+        cropped.save(output).is_ok()
+    } else {
+        false
+    }
+}
+
 // === FONCTIONS POUR FORMATS SPÉCIAUX ===
 
 /// Conversion SVG vers format raster
