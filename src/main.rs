@@ -457,7 +457,7 @@ impl eframe::App for OxyonApp {
                     ui.horizontal(|ui| {
                         ui.label("Format :");
                         egui::ComboBox::from_id_salt("dfmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
-                            for f in ["docx","html","md","odt","tex","txt"] { 
+                            for f in ["docx","html","md","nfo","odt","tex","txt"] { 
                                 ui.selectable_value(&mut self.format_choisi, f.into(), f);
                             }
                         });
