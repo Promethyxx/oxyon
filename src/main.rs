@@ -75,20 +75,25 @@ struct OxyonApp {
     #[cfg(feature = "api")]
     save_video_format: bool,
     // Options Image
-    image_action: String, // "convert", "resize", "rotate", "crop"
+    image_action: String,
     rotation_angle: u32,
     crop_x: u32,
     crop_y: u32,
     crop_width: u32,
     crop_height: u32,
-    // Resize options
     resize_width: String,
     resize_height: String,
     resize_max_kb: String,
     // Options Doc
-    doc_action: String, // "convert", "pdf_split", "pdf_merge", "pdf_rotate"
+    doc_action: String,
     pdf_rotation_angle: u16,
     pdf_pages_spec: String,
+    // Waitlist et parallélisation
+    max_parallel_jobs: usize,
+    active_jobs: Arc<Mutex<usize>>,
+    completed_jobs: Arc<Mutex<usize>>,
+    total_jobs: Arc<Mutex<usize>>,
+    job_queue: Arc<Mutex<Vec<PathBuf>>>,
 }
 
 impl Default for OxyonApp {
@@ -131,117 +136,118 @@ impl Default for OxyonApp {
             doc_action: "convert".into(),
             pdf_rotation_angle: 90,
             pdf_pages_spec: "1-end".into(),
+            max_parallel_jobs: 4,
+            active_jobs: Arc::new(Mutex::new(0)),
+            completed_jobs: Arc::new(Mutex::new(0)),
+            total_jobs: Arc::new(Mutex::new(0)),
+            job_queue: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }
 
 impl OxyonApp {
     fn load_config(&mut self) {
-    // 1. Reset : pas de défaut pour les formats, juste vide
-    match self.module_actif {
-        ModuleType::Image => self.format_choisi = String::new(),
-        ModuleType::Doc => self.format_choisi = String::new(),
-        #[cfg(feature = "api")]
-        ModuleType::Video => self.format_choisi = String::new(),
-        #[cfg(feature = "api")]
-        ModuleType::Audio => self.format_choisi = String::new(),
-        #[cfg(feature = "api")]
-        ModuleType::Archive => self.format_choisi = String::new(),
-        _ => (),
-    }
-
-    // 2. Lecture du fichier
-    if let Ok(c) = std::fs::read_to_string("config.toml") {
-        if let Ok(parsed) = c.parse::<toml::Table>() {
-            if let Some(theme) = parsed.get("display").and_then(|d| d.get("theme")).and_then(|t| t.as_str()) {
-                self.current_theme = theme.to_string();
-            }
-
-            // Charger Doc
-            if let Some(doc) = parsed.get("doc") {
-                if let Some(fmt) = doc.get("format").and_then(|f| f.as_str()) {
-                    if self.module_actif == ModuleType::Doc {
-                        self.format_choisi = fmt.to_string();
-                    }
-                }
-            }
-
-            // Charger Image
-            if let Some(img) = parsed.get("image") {
-                if let Some(fmt) = img.get("format").and_then(|f| f.as_str()) {
-                    if self.module_actif == ModuleType::Image {
-                        self.format_choisi = fmt.to_string();
-                    }
-                }
-                if let Some(ratio) = img.get("ratio_img").and_then(|r| r.as_integer()) {
-                    self.ratio_img = ratio as u32;
-                }
-            }
-
-            // Charger Archive
+        match self.module_actif {
+            ModuleType::Image => self.format_choisi = String::new(),
+            ModuleType::Doc => self.format_choisi = String::new(),
             #[cfg(feature = "api")]
-            if let Some(arc) = parsed.get("archive") {
-                if let Some(fmt) = arc.get("format").and_then(|f| f.as_str()) {
-                    if self.module_actif == ModuleType::Archive {
-                        self.format_choisi = fmt.to_string();
-                    }
-                }
-            }
-
-            // Charger Audio
+            ModuleType::Video => self.format_choisi = String::new(),
             #[cfg(feature = "api")]
-            if let Some(aud) = parsed.get("audio") {
-                if let Some(fmt) = aud.get("format").and_then(|f| f.as_str()) {
-                    if self.module_actif == ModuleType::Audio {
-                        self.format_choisi = fmt.to_string();
-                    }
-                }
-            }
-
-            // Charger Video
+            ModuleType::Audio => self.format_choisi = String::new(),
             #[cfg(feature = "api")]
-            if let Some(vid) = parsed.get("video") {
-                if let Some(fmt) = vid.get("format").and_then(|f| f.as_str()) {
-                    if self.module_actif == ModuleType::Video {
-                        self.format_choisi = fmt.to_string();
+            ModuleType::Archive => self.format_choisi = String::new(),
+            _ => (),
+        }
+
+        if let Ok(c) = std::fs::read_to_string("config.toml") {
+            if let Ok(parsed) = c.parse::<toml::Table>() {
+                if let Some(theme) = parsed.get("display").and_then(|d| d.get("theme")).and_then(|t| t.as_str()) {
+                    self.current_theme = theme.to_string();
+                }
+                if let Some(max_jobs) = parsed.get("performance").and_then(|p| p.get("max_parallel_jobs")).and_then(|j| j.as_integer()) {
+                    self.max_parallel_jobs = max_jobs as usize;
+                }
+
+                if let Some(doc) = parsed.get("doc") {
+                    if let Some(fmt) = doc.get("format").and_then(|f| f.as_str()) {
+                        if self.module_actif == ModuleType::Doc {
+                            self.format_choisi = fmt.to_string();
+                        }
                     }
                 }
-                if let Some(copie) = vid.get("copie_flux").and_then(|c| c.as_bool()) {
-                    self.copie_flux = copie;
+
+                if let Some(img) = parsed.get("image") {
+                    if let Some(fmt) = img.get("format").and_then(|f| f.as_str()) {
+                        if self.module_actif == ModuleType::Image {
+                            self.format_choisi = fmt.to_string();
+                        }
+                    }
+                    if let Some(ratio) = img.get("ratio_img").and_then(|r| r.as_integer()) {
+                        self.ratio_img = ratio as u32;
+                    }
+                }
+
+                #[cfg(feature = "api")]
+                if let Some(arc) = parsed.get("archive") {
+                    if let Some(fmt) = arc.get("format").and_then(|f| f.as_str()) {
+                        if self.module_actif == ModuleType::Archive {
+                            self.format_choisi = fmt.to_string();
+                        }
+                    }
+                }
+
+                #[cfg(feature = "api")]
+                if let Some(aud) = parsed.get("audio") {
+                    if let Some(fmt) = aud.get("format").and_then(|f| f.as_str()) {
+                        if self.module_actif == ModuleType::Audio {
+                            self.format_choisi = fmt.to_string();
+                        }
+                    }
+                }
+
+                #[cfg(feature = "api")]
+                if let Some(vid) = parsed.get("video") {
+                    if let Some(fmt) = vid.get("format").and_then(|f| f.as_str()) {
+                        if self.module_actif == ModuleType::Video {
+                            self.format_choisi = fmt.to_string();
+                        }
+                    }
+                    if let Some(copie) = vid.get("copie_flux").and_then(|c| c.as_bool()) {
+                        self.copie_flux = copie;
+                    }
                 }
             }
         }
     }
-}
 
     fn save_config(&self) {
-        // Charger le fichier existant ou créer un nouveau toml::Table
         let mut parsed = if let Ok(c) = std::fs::read_to_string("config.toml") {
             c.parse::<toml::Table>().unwrap_or_else(|_| toml::Table::new())
         } else {
             toml::Table::new()
         };
 
-        // Sauvegarder le thème
         let display = parsed.entry("display").or_insert(toml::Value::Table(toml::Table::new()));
         if let Some(display_table) = display.as_table_mut() {
             display_table.insert("theme".to_string(), toml::Value::String(self.current_theme.clone()));
         }
+        
+        let perf = parsed.entry("performance").or_insert(toml::Value::Table(toml::Table::new()));
+        if let Some(perf_table) = perf.as_table_mut() {
+            perf_table.insert("max_parallel_jobs".to_string(), toml::Value::Integer(self.max_parallel_jobs as i64));
+        }
 
-        // Sauvegarder Doc si coché
         if self.save_doc_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Doc {
             let doc = parsed.entry("doc").or_insert(toml::Value::Table(toml::Table::new()));
             if let Some(doc_table) = doc.as_table_mut() {
                 doc_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
             }
         } else if !self.save_doc_format && self.module_actif == ModuleType::Doc {
-            // Retirer la section doc si décoché
             if let Some(doc_table) = parsed.get_mut("doc").and_then(|v| v.as_table_mut()) {
                 doc_table.remove("format");
             }
         }
 
-        // Sauvegarder Image si coché
         if self.save_image_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Image {
             let image = parsed.entry("image").or_insert(toml::Value::Table(toml::Table::new()));
             if let Some(img_table) = image.as_table_mut() {
@@ -254,7 +260,6 @@ impl OxyonApp {
             }
         }
 
-        // Toujours sauvegarder ratio_img pour Image
         if self.module_actif == ModuleType::Image {
             let image = parsed.entry("image").or_insert(toml::Value::Table(toml::Table::new()));
             if let Some(img_table) = image.as_table_mut() {
@@ -262,59 +267,50 @@ impl OxyonApp {
             }
         }
 
-        // Sauvegarder Archive si coché
         #[cfg(feature = "api")]
-        if self.save_archive_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Archive {
-            let archive = parsed.entry("archive").or_insert(toml::Value::Table(toml::Table::new()));
-            if let Some(arc_table) = archive.as_table_mut() {
-                arc_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
+        {
+            if self.save_archive_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Archive {
+                let archive = parsed.entry("archive").or_insert(toml::Value::Table(toml::Table::new()));
+                if let Some(arc_table) = archive.as_table_mut() {
+                    arc_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
+                }
+            } else if !self.save_archive_format && self.module_actif == ModuleType::Archive {
+                if let Some(arc_table) = parsed.get_mut("archive").and_then(|v| v.as_table_mut()) {
+                    arc_table.remove("format");
+                }
             }
-        } else if !self.save_archive_format && self.module_actif == ModuleType::Archive {
-            #[cfg(feature = "api")]
-            if let Some(arc_table) = parsed.get_mut("archive").and_then(|v| v.as_table_mut()) {
-                arc_table.remove("format");
+
+            if self.save_audio_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Audio {
+                let audio = parsed.entry("audio").or_insert(toml::Value::Table(toml::Table::new()));
+                if let Some(aud_table) = audio.as_table_mut() {
+                    aud_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
+                }
+            } else if !self.save_audio_format && self.module_actif == ModuleType::Audio {
+                if let Some(aud_table) = parsed.get_mut("audio").and_then(|v| v.as_table_mut()) {
+                    aud_table.remove("format");
+                }
+            }
+
+            if self.save_video_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Video {
+                let video = parsed.entry("video").or_insert(toml::Value::Table(toml::Table::new()));
+                if let Some(vid_table) = video.as_table_mut() {
+                    vid_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
+                    vid_table.insert("copie_flux".to_string(), toml::Value::Boolean(self.copie_flux));
+                }
+            } else if !self.save_video_format && self.module_actif == ModuleType::Video {
+                if let Some(vid_table) = parsed.get_mut("video").and_then(|v| v.as_table_mut()) {
+                    vid_table.remove("format");
+                }
+            }
+
+            if self.module_actif == ModuleType::Video {
+                let video = parsed.entry("video").or_insert(toml::Value::Table(toml::Table::new()));
+                if let Some(vid_table) = video.as_table_mut() {
+                    vid_table.insert("copie_flux".to_string(), toml::Value::Boolean(self.copie_flux));
+                }
             }
         }
 
-        // Sauvegarder Audio si coché
-        #[cfg(feature = "api")]
-        if self.save_audio_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Audio {
-            let audio = parsed.entry("audio").or_insert(toml::Value::Table(toml::Table::new()));
-            if let Some(aud_table) = audio.as_table_mut() {
-                aud_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
-            }
-        } else if !self.save_audio_format && self.module_actif == ModuleType::Audio {
-            #[cfg(feature = "api")]
-            if let Some(aud_table) = parsed.get_mut("audio").and_then(|v| v.as_table_mut()) {
-                aud_table.remove("format");
-            }
-        }
-
-        // Sauvegarder Video si coché
-        #[cfg(feature = "api")]
-        if self.save_video_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Video {
-            let video = parsed.entry("video").or_insert(toml::Value::Table(toml::Table::new()));
-            if let Some(vid_table) = video.as_table_mut() {
-                vid_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
-                vid_table.insert("copie_flux".to_string(), toml::Value::Boolean(self.copie_flux));
-            }
-        } else if !self.save_video_format && self.module_actif == ModuleType::Video {
-            #[cfg(feature = "api")]
-            if let Some(vid_table) = parsed.get_mut("video").and_then(|v| v.as_table_mut()) {
-                vid_table.remove("format");
-            }
-        }
-
-        // Toujours sauvegarder copie_flux pour Video
-        #[cfg(feature = "api")]
-        if self.module_actif == ModuleType::Video {
-            let video = parsed.entry("video").or_insert(toml::Value::Table(toml::Table::new()));
-            if let Some(vid_table) = video.as_table_mut() {
-                vid_table.insert("copie_flux".to_string(), toml::Value::Boolean(self.copie_flux));
-            }
-        }
-
-        // Écrire le fichier
         let _ = std::fs::write("config.toml", toml::to_string(&parsed).unwrap_or_default());
     }
 
@@ -330,20 +326,35 @@ impl OxyonApp {
         self.deps_manquantes = Vec::new();
     }
 
-    fn lancer_action(&mut self, input: PathBuf) {
-        let output = input.parent().unwrap().join(format!(
-            "{}_oxyon.{}",
-            input.file_stem().unwrap_or_default().to_string_lossy(),
-            self.format_choisi
-        ));
-        let out_str = output.to_str().unwrap().to_string();
+    fn lancer_batch(&mut self, ctx: egui::Context) {
+        *self.completed_jobs.lock().unwrap() = 0;
+        *self.total_jobs.lock().unwrap() = self.current_files.len();
+        *self.active_jobs.lock().unwrap() = 0;
+        
+        let mut queue = self.job_queue.lock().unwrap();
+        queue.clear();
+        queue.extend(self.current_files.clone());
+        drop(queue);
+        
+        *self.status.lock().unwrap() = format!("🚀 Démarrage de {} tâches...", self.current_files.len());
+        
+        for _ in 0..self.max_parallel_jobs.min(self.current_files.len()) {
+            self.spawn_worker(ctx.clone());
+        }
+    }
+    
+    fn spawn_worker(&mut self, ctx: egui::Context) {
+        let queue = Arc::clone(&self.job_queue);
+        let active = Arc::clone(&self.active_jobs);
+        let completed = Arc::clone(&self.completed_jobs);
+        let total = Arc::clone(&self.total_jobs);
+        let status_arc = Arc::clone(&self.status);
+        
         let module = self.module_actif;
         let fmt = self.format_choisi.clone();
         let ratio = self.ratio_img;
         #[cfg(feature = "api")]
         let copie = self.copie_flux;
-        
-        // Copier les paramètres Image
         let img_action = self.image_action.clone();
         let angle = self.rotation_angle;
         let crop_x = self.crop_x;
@@ -353,112 +364,133 @@ impl OxyonApp {
         let resize_w = self.resize_width.parse::<u32>().unwrap_or(0);
         let resize_h = self.resize_height.parse::<u32>().unwrap_or(0);
         let resize_kb = self.resize_max_kb.parse::<u32>().unwrap_or(0);
-        
-        // Copier les paramètres Doc
         let doc_action = self.doc_action.clone();
         let pdf_angle = self.pdf_rotation_angle;
         let pdf_pages = self.pdf_pages_spec.clone();
         let pdf_merge_list = self.current_files.clone();
         
-        let status_arc = Arc::clone(&self.status);
-        *self.status.lock().unwrap() = "🚀 Action en cours...".into();
-
-        match module {
-            #[cfg(feature = "api")]
-            ModuleType::Video => {
-                match modules::video::traiter_video(&input, &out_str, copie, false) {
-                    Ok(c) => self.process = Some(c),
-                    Err(e) => {
-                        log_error(&format!("Vidéo: {:?} sur {:?}", e, input));
-                        *self.status.lock().unwrap() = "❌ Erreur Vidéo (voir log)".into();
-                    }
-                }
-            }
-            #[cfg(feature = "api")]
-            ModuleType::Audio => {
-                match modules::audio::convertir(&input, &out_str, "192k") {
-                    Ok(c) => self.process = Some(c),
-                    Err(e) => {
-                        log_error(&format!("Audio: {:?} sur {:?}", e, input));
-                        *self.status.lock().unwrap() = "❌ Erreur Audio (voir log)".into();
-                    }
-                }
-            }
-            _ => {
-                std::thread::spawn(move || {
-                    let success = match module {
-                        #[cfg(feature = "api")]
-                        ModuleType::Archive => modules::archive::compresser(&input, &out_str, &fmt),
-                        ModuleType::Doc => {
-                            match doc_action.as_str() {
-                                "convert" => {
-                                    let format_entree = modules::doc::detecter_format_entree(&input);
-                                    let format_sortie = modules::doc::detecter_format_sortie(&out_str);
-                                    modules::doc::convertir_avec_formats(&input, &out_str, format_entree, format_sortie)
-                                },
-                                "pdf_split" => {
-                                    let output_dir = input.parent().unwrap().join(format!(
-                                        "{}_pages",
-                                        input.file_stem().unwrap_or_default().to_string_lossy()
-                                    ));
-                                    std::fs::create_dir_all(&output_dir).ok();
-                                    modules::doc::pdf_split(&input, output_dir.to_str().unwrap()).is_ok()
-                                },
-                                "pdf_merge" => {
-                                    let paths: Vec<&Path> = pdf_merge_list.iter().map(|p| p.as_path()).collect();
-                                    let output = input.parent().unwrap().join("merged_oxyon.pdf");
-                                    modules::doc::pdf_merge(&paths, output.to_str().unwrap())
-                                },
-                                "pdf_rotate" => {
-                                    let pages_opt = if pdf_pages == "1-end" { None } else { Some(pdf_pages.as_str()) };
-                                    modules::doc::pdf_rotate(&input, &out_str, pdf_angle, pages_opt)
-                                },
-                                _ => modules::doc::convertir(&input, &out_str),
-                            }
-                        },
-                        ModuleType::Image => {
-                            match img_action.as_str() {
-                                "convert" => modules::pic::compresser(&input, &out_str, ratio),
-                                "resize" => {
-                                    // Priorité : Si pixels ET poids, faire pixels puis poids
-                                    if resize_w > 0 && resize_h > 0 {
-                                        // Resize par pixels
-                                        if resize_kb > 0 {
-                                            // Puis compresser par poids
-                                            let temp = format!("{}_temp.{}", out_str, fmt);
-                                            if modules::pic::redimensionner_pixels(&input, &temp, resize_w, resize_h) {
-                                                modules::pic::redimensionner_poids(Path::new(&temp), &out_str, resize_kb)
-                                            } else {
-                                                false
-                                            }
+        std::thread::spawn(move || {
+            loop {
+                let job = {
+                    let mut q = queue.lock().unwrap();
+                    q.pop()
+                };
+                
+                let input = match job {
+                    Some(path) => path,
+                    None => break,
+                };
+                
+                *active.lock().unwrap() += 1;
+                
+                let output = input.parent().unwrap().join(format!(
+                    "{}_oxyon.{}",
+                    input.file_stem().unwrap_or_default().to_string_lossy(),
+                    fmt
+                ));
+                let out_str = output.to_str().unwrap().to_string();
+                
+                let current = *completed.lock().unwrap() + *active.lock().unwrap();
+                let total_count = *total.lock().unwrap();
+                *status_arc.lock().unwrap() = format!("⚙️ Traitement {}/{} fichiers...", current, total_count);
+                ctx.request_repaint();
+                
+                let success = match module {
+                    #[cfg(feature = "api")]
+                    ModuleType::Archive => modules::archive::compresser(&input, &out_str, &fmt),
+                    #[cfg(feature = "api")]
+                    ModuleType::Audio => {
+                        match modules::audio::convertir(&input, &out_str, "192k") {
+                            Ok(mut child) => {
+                                child.wait().is_ok()
+                            },
+                            Err(_) => false
+                        }
+                    },
+                    #[cfg(feature = "api")]
+                    ModuleType::Video => {
+                        match modules::video::traiter_video(&input, &out_str, copie, false) {
+                            Ok(mut child) => {
+                                child.wait().is_ok()
+                            },
+                            Err(_) => false
+                        }
+                    },
+                    ModuleType::Doc => {
+                        match doc_action.as_str() {
+                            "convert" => {
+                                let format_entree = modules::doc::detecter_format_entree(&input);
+                                let format_sortie = modules::doc::detecter_format_sortie(&out_str);
+                                modules::doc::convertir_avec_formats(&input, &out_str, format_entree, format_sortie)
+                            },
+                            "pdf_split" => {
+                                let output_dir = input.parent().unwrap().join(format!(
+                                    "{}_pages",
+                                    input.file_stem().unwrap_or_default().to_string_lossy()
+                                ));
+                                std::fs::create_dir_all(&output_dir).ok();
+                                modules::doc::pdf_split(&input, output_dir.to_str().unwrap()).is_ok()
+                            },
+                            "pdf_merge" => {
+                                let paths: Vec<&Path> = pdf_merge_list.iter().map(|p| p.as_path()).collect();
+                                let output_merge = input.parent().unwrap().join("merged_oxyon.pdf");
+                                modules::doc::pdf_merge(&paths, output_merge.to_str().unwrap())
+                            },
+                            "pdf_rotate" => {
+                                let pages_opt = if pdf_pages == "1-end" { None } else { Some(pdf_pages.as_str()) };
+                                modules::doc::pdf_rotate(&input, &out_str, pdf_angle, pages_opt)
+                            },
+                            _ => modules::doc::convertir(&input, &out_str),
+                        }
+                    },
+                    ModuleType::Image => {
+                        match img_action.as_str() {
+                            "convert" => modules::pic::compresser(&input, &out_str, ratio),
+                            "resize" => {
+                                if resize_w > 0 && resize_h > 0 {
+                                    if resize_kb > 0 {
+                                        let temp = format!("{}_temp.{}", out_str, fmt);
+                                        if modules::pic::redimensionner_pixels(&input, &temp, resize_w, resize_h) {
+                                            modules::pic::redimensionner_poids(Path::new(&temp), &out_str, resize_kb)
                                         } else {
-                                            modules::pic::redimensionner_pixels(&input, &out_str, resize_w, resize_h)
+                                            false
                                         }
-                                    } else if resize_kb > 0 {
-                                        // Seulement poids
-                                        modules::pic::redimensionner_poids(&input, &out_str, resize_kb)
                                     } else {
-                                        // Rien de spécifié, conversion simple
-                                        modules::pic::compresser(&input, &out_str, 1)
+                                        modules::pic::redimensionner_pixels(&input, &out_str, resize_w, resize_h)
                                     }
-                                },
-                                "rotate" => modules::pic::pivoter(&input, &out_str, angle),
-                                "crop" => modules::pic::recadrer(&input, &out_str, crop_x, crop_y, crop_w, crop_h),
-                                _ => modules::pic::compresser(&input, &out_str, ratio),
-                            }
-                        },
-                        _ => true,
-                    };
-
-                    if !success {
-                        log_error(&format!("Erreur Module {:?} sur {:?}", module, input));
-                        *status_arc.lock().unwrap() = "❌ Erreur (voir log)".into();
-                    } else {
-                        *status_arc.lock().unwrap() = "✅ Terminé".into();
-                    }
-                });
+                                } else if resize_kb > 0 {
+                                    modules::pic::redimensionner_poids(&input, &out_str, resize_kb)
+                                } else {
+                                    modules::pic::compresser(&input, &out_str, 1)
+                                }
+                            },
+                            "rotate" => modules::pic::pivoter(&input, &out_str, angle),
+                            "crop" => modules::pic::recadrer(&input, &out_str, crop_x, crop_y, crop_w, crop_h),
+                            _ => modules::pic::compresser(&input, &out_str, ratio),
+                        }
+                    },
+                    _ => true,
+                };
+                
+                if !success {
+                    log_error(&format!("Erreur Module {:?} sur {:?}", module, input));
+                }
+                
+                *active.lock().unwrap() -= 1;
+                *completed.lock().unwrap() += 1;
+                
+                let done = *completed.lock().unwrap();
+                let total_count = *total.lock().unwrap();
+                
+                if done >= total_count {
+                    *status_arc.lock().unwrap() = format!("✅ Terminé : {}/{} fichiers", done, total_count);
+                } else {
+                    *status_arc.lock().unwrap() = format!("⚙️ Traitement {}/{} fichiers...", done, total_count);
+                }
+                
+                ctx.request_repaint();
             }
-        }
+        });
     }
 }
 
@@ -557,7 +589,6 @@ impl eframe::App for OxyonApp {
                     }
                 },
                 ModuleType::Doc => {
-                    // Sélecteur d'action
                     ui.horizontal(|ui| {
                         ui.label("Action :");
                         egui::ComboBox::from_id_salt("doc_action").selected_text(&self.doc_action).show_ui(ui, |ui| {
@@ -570,7 +601,6 @@ impl eframe::App for OxyonApp {
                     
                     ui.separator();
                     
-                    // Options selon l'action choisie
                     match self.doc_action.as_str() {
                         "convert" => {
                             ui.horizontal(|ui| {
@@ -615,7 +645,6 @@ impl eframe::App for OxyonApp {
                     }
                 },
                 ModuleType::Image => {
-                    // Sélecteur d'action
                     ui.horizontal(|ui| {
                         ui.label("Action :");
                         egui::ComboBox::from_id_salt("img_action").selected_text(&self.image_action).show_ui(ui, |ui| {
@@ -628,7 +657,6 @@ impl eframe::App for OxyonApp {
                     
                     ui.separator();
                     
-                    // Options selon l'action choisie
                     match self.image_action.as_str() {
                         "convert" => {
                             ui.horizontal(|ui| {
@@ -770,6 +798,7 @@ impl eframe::App for OxyonApp {
                 ModuleType::Settings => {
                     ui.vertical(|ui| {
                         ui.heading("Paramètres");
+                        
                         let old_theme = self.current_theme.clone();
                         ui.horizontal(|ui| {
                             ui.label("Thème :");
@@ -783,6 +812,16 @@ impl eframe::App for OxyonApp {
                             self.apply_theme(ctx);
                             self.save_config();
                         }
+                        
+                        ui.separator();
+                        ui.heading("Performance");
+                        ui.horizontal(|ui| {
+                            ui.label("Jobs parallèles max :");
+                            if ui.add(egui::Slider::new(&mut self.max_parallel_jobs, 1..=16).text("threads")).changed() {
+                                self.save_config();
+                            }
+                        });
+                        ui.label("💡 Plus = plus rapide mais plus de charge CPU");
                     });
                 },
             }
@@ -793,12 +832,28 @@ impl eframe::App for OxyonApp {
 
             if !self.current_files.is_empty() && !hide_exec {
                 ui.separator();
-                if ui.button("🔥 EXÉCUTER TOUT").clicked() { for p in self.current_files.clone() { self.lancer_action(p); } }
+                if ui.button("🔥 EXÉCUTER TOUT").clicked() { 
+                    self.lancer_batch(ctx.clone()); 
+                }
             }
 
             if self.current_files.is_empty() { ui.centered_and_justified(|ui| { ui.label("📥 Glissez vos fichiers ici"); }); }
             ui.add_space(10.0);
-            ui.vertical_centered(|ui| { ui.heading(&*self.status.lock().unwrap()); });
+            ui.vertical_centered(|ui| { 
+                ui.heading(&*self.status.lock().unwrap()); 
+                
+                let active = *self.active_jobs.lock().unwrap();
+                let completed = *self.completed_jobs.lock().unwrap();
+                let total = *self.total_jobs.lock().unwrap();
+                let queue_len = self.job_queue.lock().unwrap().len();
+                
+                if total > 0 && completed < total {
+                    ui.label(format!("⚙️ Actifs: {} | ✅ Terminés: {} | 📋 En attente: {}", active, completed, queue_len));
+                    
+                    let progress = completed as f32 / total as f32;
+                    ui.add(egui::ProgressBar::new(progress).show_percentage());
+                }
+            });
             if !self.current_files.is_empty() { if ui.button("🗑️ Tout effacer").clicked() { self.current_files.clear(); } }
         });
     }
