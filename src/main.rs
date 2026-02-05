@@ -2,7 +2,7 @@
 
 mod modules;
 use eframe::egui;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -72,12 +72,16 @@ struct OxyonApp {
     #[cfg(feature = "api")]
     save_video_format: bool,
     // Options Image
-    image_action: String, // "convert", "rotate", "crop"
+    image_action: String, // "convert", "resize", "rotate", "crop"
     rotation_angle: u32,
     crop_x: u32,
     crop_y: u32,
     crop_width: u32,
     crop_height: u32,
+    // Resize options
+    resize_width: String,
+    resize_height: String,
+    resize_max_kb: String,
 }
 
 impl Default for OxyonApp {
@@ -114,6 +118,9 @@ impl Default for OxyonApp {
             crop_y: 0,
             crop_width: 100,
             crop_height: 100,
+            resize_width: String::new(),
+            resize_height: String::new(),
+            resize_max_kb: String::new(),
         }
     }
 }
@@ -333,6 +340,9 @@ impl OxyonApp {
         let crop_y = self.crop_y;
         let crop_w = self.crop_width;
         let crop_h = self.crop_height;
+        let resize_w = self.resize_width.parse::<u32>().unwrap_or(0);
+        let resize_h = self.resize_height.parse::<u32>().unwrap_or(0);
+        let resize_kb = self.resize_max_kb.parse::<u32>().unwrap_or(0);
         
         let status_arc = Arc::clone(&self.status);
         *self.status.lock().unwrap() = "🚀 Action en cours...".into();
@@ -367,6 +377,29 @@ impl OxyonApp {
                         ModuleType::Image => {
                             match img_action.as_str() {
                                 "convert" => modules::pic::compresser(&input, &out_str, ratio),
+                                "resize" => {
+                                    // Priorité : Si pixels ET poids, faire pixels puis poids
+                                    if resize_w > 0 && resize_h > 0 {
+                                        // Resize par pixels
+                                        if resize_kb > 0 {
+                                            // Puis compresser par poids
+                                            let temp = format!("{}_temp.{}", out_str, fmt);
+                                            if modules::pic::redimensionner_pixels(&input, &temp, resize_w, resize_h) {
+                                                modules::pic::redimensionner_poids(Path::new(&temp), &out_str, resize_kb)
+                                            } else {
+                                                false
+                                            }
+                                        } else {
+                                            modules::pic::redimensionner_pixels(&input, &out_str, resize_w, resize_h)
+                                        }
+                                    } else if resize_kb > 0 {
+                                        // Seulement poids
+                                        modules::pic::redimensionner_poids(&input, &out_str, resize_kb)
+                                    } else {
+                                        // Rien de spécifié, conversion simple
+                                        modules::pic::compresser(&input, &out_str, 1)
+                                    }
+                                },
                                 "rotate" => modules::pic::pivoter(&input, &out_str, angle),
                                 "crop" => modules::pic::recadrer(&input, &out_str, crop_x, crop_y, crop_w, crop_h),
                                 _ => modules::pic::compresser(&input, &out_str, ratio),
@@ -499,7 +532,8 @@ impl eframe::App for OxyonApp {
                     ui.horizontal(|ui| {
                         ui.label("Action :");
                         egui::ComboBox::from_id_salt("img_action").selected_text(&self.image_action).show_ui(ui, |ui| {
-                            ui.selectable_value(&mut self.image_action, "convert".into(), "Convert/Resize");
+                            ui.selectable_value(&mut self.image_action, "convert".into(), "Convert");
+                            ui.selectable_value(&mut self.image_action, "resize".into(), "Resize");
                             ui.selectable_value(&mut self.image_action, "rotate".into(), "Rotate");
                             ui.selectable_value(&mut self.image_action, "crop".into(), "Crop");
                         });
@@ -524,6 +558,32 @@ impl eframe::App for OxyonApp {
                             if ui.add(egui::Slider::new(&mut self.ratio_img, 1..=10).text("Qualité/Ratio")).changed() { 
                                 self.save_config(); 
                             }
+                        },
+                        "resize" => {
+                            ui.horizontal(|ui| {
+                                ui.label("Format :");
+                                egui::ComboBox::from_id_salt("ifmt_resize").selected_text(&self.format_choisi).show_ui(ui, |ui| {
+                                    for f in ["AVIF","DNG","EXR","GIF","HDR","HEIC","ICO","JPG","JXL","PNG","PSD","RAW","SVG","TIFF","WebP"] { 
+                                        ui.selectable_value(&mut self.format_choisi, f.into(), f);
+                                    }
+                                });
+                            });
+                            if ui.checkbox(&mut self.save_image_format, "💾 Sauvegarder ce format").changed() {
+                                self.save_config();
+                            }
+                            ui.separator();
+                            ui.label("Redimensionner par taille (pixels) :");
+                            ui.horizontal(|ui| {
+                                ui.label("Largeur :");
+                                ui.text_edit_singleline(&mut self.resize_width);
+                                ui.label("Hauteur :");
+                                ui.text_edit_singleline(&mut self.resize_height);
+                            });
+                            ui.label("ET/OU");
+                            ui.horizontal(|ui| {
+                                ui.label("Poids max (Ko) :");
+                                ui.text_edit_singleline(&mut self.resize_max_kb);
+                            });
                         },
                         "rotate" => {
                             ui.horizontal(|ui| {

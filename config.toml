@@ -1,5 +1,8 @@
 [display]
 theme = "Dark"
 
+[image]
+ratio_img = 3
+
 [video]
 copie_flux = false

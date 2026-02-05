@@ -160,6 +160,51 @@ pub fn recadrer(input: &Path, output: &str, x_pct: u32, y_pct: u32, width_pct: u
     }
 }
 
+/// Redimensionne à une largeur/hauteur spécifique en pixels
+pub fn redimensionner_pixels(input: &Path, output: &str, target_width: u32, target_height: u32) -> bool {
+    if let Ok(img) = image::open(input) {
+        let resized = img.resize_exact(target_width, target_height, FilterType::Lanczos3);
+        resized.save(output).is_ok()
+    } else {
+        false
+    }
+}
+
+/// Redimensionne pour atteindre un poids maximum (en Ko)
+/// Réduit progressivement jusqu'à atteindre le poids cible
+pub fn redimensionner_poids(input: &Path, output: &str, max_size_kb: u32) -> bool {
+    let img = match image::open(input) {
+        Ok(i) => i,
+        Err(_) => return false,
+    };
+    
+    let (orig_w, orig_h) = (img.width(), img.height());
+    let max_size_bytes = max_size_kb as u64 * 1024;
+    
+    // Essayer différents ratios jusqu'à obtenir la taille voulue
+    for ratio in 1..=10 {
+        let new_w = orig_w / ratio;
+        let new_h = orig_h / ratio;
+        
+        if new_w < 10 || new_h < 10 {
+            break; // Trop petit
+        }
+        
+        let resized = img.resize(new_w, new_h, FilterType::Lanczos3);
+        
+        // Sauvegarder temporairement pour vérifier la taille
+        if resized.save(output).is_ok() {
+            if let Ok(metadata) = std::fs::metadata(output) {
+                if metadata.len() <= max_size_bytes {
+                    return true; // Taille atteinte !
+                }
+            }
+        }
+    }
+    
+    false
+}
+
 // === FONCTIONS POUR FORMATS SPÉCIAUX ===
 
 /// Conversion SVG vers format raster
