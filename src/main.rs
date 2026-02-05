@@ -63,6 +63,14 @@ struct OxyonApp {
     #[cfg(feature = "api")]
     tag_edit_val: String,
     current_theme: String,
+    save_doc_format: bool,
+    save_image_format: bool,
+    #[cfg(feature = "api")]
+    save_archive_format: bool,
+    #[cfg(feature = "api")]
+    save_audio_format: bool,
+    #[cfg(feature = "api")]
+    save_video_format: bool,
 }
 
 impl Default for OxyonApp {
@@ -85,89 +93,199 @@ impl Default for OxyonApp {
             #[cfg(feature = "api")]
             tag_edit_val: String::new(),
             current_theme: "Dark".into(),
+            save_doc_format: false,
+            save_image_format: false,
+            #[cfg(feature = "api")]
+            save_archive_format: false,
+            #[cfg(feature = "api")]
+            save_audio_format: false,
+            #[cfg(feature = "api")]
+            save_video_format: false,
         }
     }
 }
 
 impl OxyonApp {
     fn load_config(&mut self) {
-    // 1. Reset systématique : On définit le défaut AVANT de lire le fichier
+    // 1. Reset : pas de défaut pour les formats, juste vide
     match self.module_actif {
-        ModuleType::Image => self.format_choisi = "PNG".into(),
-        ModuleType::Doc => self.format_choisi = "pdf".into(),
+        ModuleType::Image => self.format_choisi = String::new(),
+        ModuleType::Doc => self.format_choisi = String::new(),
         #[cfg(feature = "api")]
-        ModuleType::Video => self.format_choisi = "mkv".into(),
+        ModuleType::Video => self.format_choisi = String::new(),
         #[cfg(feature = "api")]
-        ModuleType::Audio => self.format_choisi = "mp3".into(),
+        ModuleType::Audio => self.format_choisi = String::new(),
         #[cfg(feature = "api")]
-        ModuleType::Archive => self.format_choisi = "7z".into(),
+        ModuleType::Archive => self.format_choisi = String::new(),
         _ => (),
     }
 
-    // 2. Lecture du fichier : Si la section existe, elle écrase le défaut ci-dessus
+    // 2. Lecture du fichier
     if let Ok(c) = std::fs::read_to_string("config.toml") {
         if let Ok(parsed) = c.parse::<toml::Table>() {
             if let Some(theme) = parsed.get("display").and_then(|d| d.get("theme")).and_then(|t| t.as_str()) {
                 self.current_theme = theme.to_string();
             }
 
-            let section = match self.module_actif {
-                ModuleType::Image => "image",
-                ModuleType::Doc => "doc",
-                #[cfg(feature = "api")]
-                ModuleType::Archive => "archive",
-                #[cfg(feature = "api")]
-                ModuleType::Audio => "audio",
-                #[cfg(feature = "api")]
-                ModuleType::Video => "video",
-                _ => "",
-            };
-
-            if let Some(s) = parsed.get(section) {
-                if let Some(fmt) = s.get("format").and_then(|f| f.as_str()) {
-                    self.format_choisi = fmt.to_string(); // Ici, mkv sera chargé pour la vidéo
+            // Charger Doc
+            if let Some(doc) = parsed.get("doc") {
+                if let Some(fmt) = doc.get("format").and_then(|f| f.as_str()) {
+                    if self.module_actif == ModuleType::Doc {
+                        self.format_choisi = fmt.to_string();
+                    }
                 }
-                // ... reste du code (ratio_img, copie_flux)
+            }
+
+            // Charger Image
+            if let Some(img) = parsed.get("image") {
+                if let Some(fmt) = img.get("format").and_then(|f| f.as_str()) {
+                    if self.module_actif == ModuleType::Image {
+                        self.format_choisi = fmt.to_string();
+                    }
+                }
+                if let Some(ratio) = img.get("ratio_img").and_then(|r| r.as_integer()) {
+                    self.ratio_img = ratio as u32;
+                }
+            }
+
+            // Charger Archive
+            #[cfg(feature = "api")]
+            if let Some(arc) = parsed.get("archive") {
+                if let Some(fmt) = arc.get("format").and_then(|f| f.as_str()) {
+                    if self.module_actif == ModuleType::Archive {
+                        self.format_choisi = fmt.to_string();
+                    }
+                }
+            }
+
+            // Charger Audio
+            #[cfg(feature = "api")]
+            if let Some(aud) = parsed.get("audio") {
+                if let Some(fmt) = aud.get("format").and_then(|f| f.as_str()) {
+                    if self.module_actif == ModuleType::Audio {
+                        self.format_choisi = fmt.to_string();
+                    }
+                }
+            }
+
+            // Charger Video
+            #[cfg(feature = "api")]
+            if let Some(vid) = parsed.get("video") {
+                if let Some(fmt) = vid.get("format").and_then(|f| f.as_str()) {
+                    if self.module_actif == ModuleType::Video {
+                        self.format_choisi = fmt.to_string();
+                    }
+                }
+                if let Some(copie) = vid.get("copie_flux").and_then(|c| c.as_bool()) {
+                    self.copie_flux = copie;
+                }
             }
         }
     }
 }
 
     fn save_config(&self) {
-        let mut toml = String::new();
+        // Charger le fichier existant ou créer un nouveau toml::Table
+        let mut parsed = if let Ok(c) = std::fs::read_to_string("config.toml") {
+            c.parse::<toml::Table>().unwrap_or_else(|_| toml::Table::new())
+        } else {
+            toml::Table::new()
+        };
 
-        toml.push_str("[archive]\n");
-        #[cfg(feature = "api")]
-        toml.push_str(&format!("format = \"{}\"\n\n", if self.module_actif == ModuleType::Archive { &self.format_choisi } else { "7z" }));
-        #[cfg(not(feature = "api"))]
-        toml.push_str("format = \"7z\"\n\n");
-
-        toml.push_str("[audio]\n");
-        #[cfg(feature = "api")]
-        toml.push_str(&format!("format = \"{}\"\n\n", if self.module_actif == ModuleType::Audio { &self.format_choisi } else { "aac" }));
-        #[cfg(not(feature = "api"))]
-        toml.push_str("format = \"aac\"\n\n");
-
-        toml.push_str("[display]\n");
-        toml.push_str(&format!("theme = \"{}\"\n\n", self.current_theme));
-
-        toml.push_str("[image]\n");
-        toml.push_str(&format!("format = \"{}\"\n", if self.module_actif == ModuleType::Image { &self.format_choisi } else { "PNG" }));
-        toml.push_str(&format!("ratio_img = {}\n\n", self.ratio_img));
-
-        toml.push_str("[video]\n");
-        #[cfg(feature = "api")]
-        {
-            toml.push_str(&format!("copie_flux = {}\n", self.copie_flux));
-            toml.push_str(&format!("format = \"{}\"\n", if self.module_actif == ModuleType::Video { &self.format_choisi } else { "mkv" }));
-        }
-        #[cfg(not(feature = "api"))]
-        {
-            toml.push_str("copie_flux = false\n");
-            toml.push_str("format = \"mkv\"\n");
+        // Sauvegarder le thème
+        let display = parsed.entry("display").or_insert(toml::Value::Table(toml::Table::new()));
+        if let Some(display_table) = display.as_table_mut() {
+            display_table.insert("theme".to_string(), toml::Value::String(self.current_theme.clone()));
         }
 
-        let _ = std::fs::write("config.toml", toml);
+        // Sauvegarder Doc si coché
+        if self.save_doc_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Doc {
+            let doc = parsed.entry("doc").or_insert(toml::Value::Table(toml::Table::new()));
+            if let Some(doc_table) = doc.as_table_mut() {
+                doc_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
+            }
+        } else if !self.save_doc_format && self.module_actif == ModuleType::Doc {
+            // Retirer la section doc si décoché
+            if let Some(doc_table) = parsed.get_mut("doc").and_then(|v| v.as_table_mut()) {
+                doc_table.remove("format");
+            }
+        }
+
+        // Sauvegarder Image si coché
+        if self.save_image_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Image {
+            let image = parsed.entry("image").or_insert(toml::Value::Table(toml::Table::new()));
+            if let Some(img_table) = image.as_table_mut() {
+                img_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
+                img_table.insert("ratio_img".to_string(), toml::Value::Integer(self.ratio_img as i64));
+            }
+        } else if !self.save_image_format && self.module_actif == ModuleType::Image {
+            if let Some(img_table) = parsed.get_mut("image").and_then(|v| v.as_table_mut()) {
+                img_table.remove("format");
+            }
+        }
+
+        // Toujours sauvegarder ratio_img pour Image
+        if self.module_actif == ModuleType::Image {
+            let image = parsed.entry("image").or_insert(toml::Value::Table(toml::Table::new()));
+            if let Some(img_table) = image.as_table_mut() {
+                img_table.insert("ratio_img".to_string(), toml::Value::Integer(self.ratio_img as i64));
+            }
+        }
+
+        // Sauvegarder Archive si coché
+        #[cfg(feature = "api")]
+        if self.save_archive_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Archive {
+            let archive = parsed.entry("archive").or_insert(toml::Value::Table(toml::Table::new()));
+            if let Some(arc_table) = archive.as_table_mut() {
+                arc_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
+            }
+        } else if !self.save_archive_format && self.module_actif == ModuleType::Archive {
+            #[cfg(feature = "api")]
+            if let Some(arc_table) = parsed.get_mut("archive").and_then(|v| v.as_table_mut()) {
+                arc_table.remove("format");
+            }
+        }
+
+        // Sauvegarder Audio si coché
+        #[cfg(feature = "api")]
+        if self.save_audio_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Audio {
+            let audio = parsed.entry("audio").or_insert(toml::Value::Table(toml::Table::new()));
+            if let Some(aud_table) = audio.as_table_mut() {
+                aud_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
+            }
+        } else if !self.save_audio_format && self.module_actif == ModuleType::Audio {
+            #[cfg(feature = "api")]
+            if let Some(aud_table) = parsed.get_mut("audio").and_then(|v| v.as_table_mut()) {
+                aud_table.remove("format");
+            }
+        }
+
+        // Sauvegarder Video si coché
+        #[cfg(feature = "api")]
+        if self.save_video_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Video {
+            let video = parsed.entry("video").or_insert(toml::Value::Table(toml::Table::new()));
+            if let Some(vid_table) = video.as_table_mut() {
+                vid_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
+                vid_table.insert("copie_flux".to_string(), toml::Value::Boolean(self.copie_flux));
+            }
+        } else if !self.save_video_format && self.module_actif == ModuleType::Video {
+            #[cfg(feature = "api")]
+            if let Some(vid_table) = parsed.get_mut("video").and_then(|v| v.as_table_mut()) {
+                vid_table.remove("format");
+            }
+        }
+
+        // Toujours sauvegarder copie_flux pour Video
+        #[cfg(feature = "api")]
+        if self.module_actif == ModuleType::Video {
+            let video = parsed.entry("video").or_insert(toml::Value::Table(toml::Table::new()));
+            if let Some(vid_table) = video.as_table_mut() {
+                vid_table.insert("copie_flux".to_string(), toml::Value::Boolean(self.copie_flux));
+            }
+        }
+
+        // Écrire le fichier
+        let _ = std::fs::write("config.toml", toml::to_string(&parsed).unwrap_or_default());
     }
 
     fn apply_theme(&self, ctx: &egui::Context) {
@@ -305,10 +423,13 @@ impl eframe::App for OxyonApp {
                         ui.label("Format :");
                         egui::ComboBox::from_id_salt("arfmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
                             for f in ["7z", "tar", "zip"] { 
-                                if ui.selectable_value(&mut self.format_choisi, f.into(), f).changed() { self.save_config(); }
+                                ui.selectable_value(&mut self.format_choisi, f.into(), f);
                             }
                         });
                     });
+                    if ui.checkbox(&mut self.save_archive_format, "💾 Sauvegarder ce format").changed() {
+                        self.save_config();
+                    }
                     ui.horizontal(|ui| { ui.label("Découpage (Mo) :"); ui.text_edit_singleline(&mut self.taille_vol); });
                 },
                 #[cfg(feature = "api")]
@@ -317,10 +438,13 @@ impl eframe::App for OxyonApp {
                         ui.label("Format :");
                         egui::ComboBox::from_id_salt("afmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
                             for f in ["aac","flac","mp3","ogg","wav"] { 
-                                if ui.selectable_value(&mut self.format_choisi, f.into(), f).changed() { self.save_config(); }
+                                ui.selectable_value(&mut self.format_choisi, f.into(), f);
                             }
                         });
                     });
+                    if ui.checkbox(&mut self.save_audio_format, "💾 Sauvegarder ce format").changed() {
+                        self.save_config();
+                    }
                     if ui.button("🎵 Extraire Original (Auto)").clicked() {
                         for p in self.current_files.clone() {
                             let ext = modules::audio::detecter_extension(&p);
@@ -333,21 +457,27 @@ impl eframe::App for OxyonApp {
                     ui.horizontal(|ui| {
                         ui.label("Format :");
                         egui::ComboBox::from_id_salt("dfmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
-                            for f in ["docx","html","json","md","odt","tex","txt","typst","yaml"] { 
-                                if ui.selectable_value(&mut self.format_choisi, f.into(), f).changed() { self.save_config(); }
+                            for f in ["docx","html","md","odt","tex","txt"] { 
+                                ui.selectable_value(&mut self.format_choisi, f.into(), f);
                             }
                         });
                     });
+                    if ui.checkbox(&mut self.save_doc_format, "💾 Sauvegarder ce format").changed() {
+                        self.save_config();
+                    }
                 },
                 ModuleType::Image => {
                     ui.horizontal(|ui| {
                         ui.label("Format :");
                         egui::ComboBox::from_id_salt("ifmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
                             for f in ["GIF","JPG","PNG","WebP"] { 
-                                if ui.selectable_value(&mut self.format_choisi, f.into(), f).changed() { self.save_config(); }
+                                ui.selectable_value(&mut self.format_choisi, f.into(), f);
                             }
                         });
                     });
+                    if ui.checkbox(&mut self.save_image_format, "💾 Sauvegarder ce format").changed() {
+                        self.save_config();
+                    }
                     if ui.add(egui::Slider::new(&mut self.ratio_img, 1..=10).text("Qualité")).changed() { self.save_config(); }
                 },
                 #[cfg(feature = "api")]
@@ -355,11 +485,14 @@ impl eframe::App for OxyonApp {
                     ui.horizontal(|ui| {
                         egui::ComboBox::from_id_salt("vfmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
                             for f in ["mkv","mp4","webm"] { 
-                                if ui.selectable_value(&mut self.format_choisi, f.into(), f).changed() { self.save_config(); }
+                                ui.selectable_value(&mut self.format_choisi, f.into(), f);
                             }
                         });
                         if ui.checkbox(&mut self.copie_flux, "Copie flux").changed() { self.save_config(); }
                     });
+                    if ui.checkbox(&mut self.save_video_format, "💾 Sauvegarder ce format").changed() {
+                        self.save_config();
+                    }
                 },
                 #[cfg(feature = "api")]
                 ModuleType::Scrapper => {

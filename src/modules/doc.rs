@@ -24,12 +24,9 @@ pub enum FormatEntree {
 #[derive(Debug, Clone, Copy)]
 pub enum FormatSortie {
     Docx,
-    Json,
+    Html,
     Md,
     Odt,
-    Typst,
-    Yaml,
-    Html,
     Tex,
     Plain,
 }
@@ -59,12 +56,9 @@ impl FormatSortie {
     pub fn to_pandoc_arg(&self) -> &str {
         match self {
             Self::Docx => "docx",
-            Self::Json => "json",
+            Self::Html => "html",
             Self::Md => "markdown",
             Self::Odt => "odt",
-            Self::Typst => "typst",
-            Self::Yaml => "markdown",
-            Self::Html => "html",
             Self::Tex => "latex",
             Self::Plain => "plain",
         }
@@ -180,12 +174,9 @@ pub fn detecter_format_sortie(output: &str) -> Option<FormatSortie> {
     let path = Path::new(output);
     path.extension()?.to_str().and_then(|ext| match ext.to_lowercase().as_str() {
         "docx" => Some(FormatSortie::Docx),
-        "json" => Some(FormatSortie::Json),
+        "html" | "htm" => Some(FormatSortie::Html),
         "md" | "markdown" => Some(FormatSortie::Md),
         "odt" => Some(FormatSortie::Odt),
-        "typst" | "typ" => Some(FormatSortie::Typst),
-        "yaml" | "yml" => Some(FormatSortie::Yaml),
-        "html" | "htm" => Some(FormatSortie::Html),
         "tex" => Some(FormatSortie::Tex),
         "txt" => Some(FormatSortie::Plain),
         _ => None,

@@ -1,16 +1,5 @@
-[archive]
-format = "7z"
-
-[audio]
-format = "aac"
-
 [display]
 theme = "Dark"
 
-[image]
-format = "PNG"
-ratio_img = 2
-
 [video]
 copie_flux = false
-format = "mkv"
