@@ -29,7 +29,7 @@ jobs:
     # NETTOYAGE INTÉGRAL DES ANCIENNES VERSIONS
     - name: Cleanup old versions
       run: |
-        $old_files = @("bin/oxyon.exe", "bin/oxyon-full.exe", "bin/oxyon-office.exe", "oxyon-full.exe", "oxyon-office.exe")
+        $old_files = @("bin/oxyon.exe", "bin/oxyon-full.exe", "bin/oxyon-office.exe", "oxyon.exe", "oxyon-full.exe", "oxyon-office.exe")
         foreach ($f in $old_files) {
           if (Test-Path $f) { 
             Remove-Item $f -Force
