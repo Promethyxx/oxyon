@@ -18,6 +18,7 @@ pub enum FormatEntree {
     Html,
     Tex,
     Rst,
+    Pdf,
 }
 
 /// Liste des formats supportés en sortie par Pandoc
@@ -29,6 +30,7 @@ pub enum FormatSortie {
     Odt,
     Tex,
     Plain,
+    Pdf,
 }
 
 impl FormatEntree {
@@ -47,6 +49,7 @@ impl FormatEntree {
             Self::Html => "html",
             Self::Tex => "latex",
             Self::Rst => "rst",
+            Self::Pdf => "pdf",
         }
     }
 }
@@ -61,6 +64,7 @@ impl FormatSortie {
             Self::Odt => "odt",
             Self::Tex => "latex",
             Self::Plain => "plain",
+            Self::Pdf => "pdf",
         }
     }
 }
@@ -150,6 +154,105 @@ pub fn convertir_typst(input: &Path, output: &str, format_sortie: FormatSortie) 
     convertir_avec_formats(input, output, Some(FormatEntree::Typst), Some(format_sortie))
 }
 
+/// **NOUVELLE FONCTION** : Convertit PDF vers d'autres formats (via conversion intermédiaire)
+pub fn convertir_pdf(input: &Path, output: &str, format_sortie: FormatSortie) -> bool {
+    // Pour PDF en entrée, on utilise pdftotext puis Pandoc
+    // Ou directement Pandoc si disponible avec support PDF
+    convertir_avec_formats(input, output, Some(FormatEntree::Pdf), Some(format_sortie))
+}
+
+/// **NOUVELLE FONCTION** : Convertit vers PDF (via LaTeX intermédiaire si nécessaire)
+pub fn convertir_vers_pdf(input: &Path, format_entree: Option<FormatEntree>) -> Result<String, String> {
+    let output = input.with_extension("pdf");
+    let output_str = output.to_str().ok_or("Invalid output path")?;
+    
+    let success = convertir_avec_formats(
+        input,
+        output_str,
+        format_entree,
+        Some(FormatSortie::Pdf)
+    );
+    
+    if success {
+        Ok(output_str.to_string())
+    } else {
+        Err("Conversion vers PDF échouée".to_string())
+    }
+}
+
+/// **NOUVELLE FONCTION** : Divise un PDF en pages individuelles
+pub fn pdf_split(input: &Path, output_dir: &str) -> Result<Vec<String>, String> {
+    use std::fs;
+    
+    // Utilise pdftk ou qpdf pour diviser
+    let status = Command::new("pdftk")
+        .arg(input.to_str().unwrap())
+        .arg("burst")
+        .arg("output")
+        .arg(format!("{}/page_%04d.pdf", output_dir))
+        .status();
+    
+    match status {
+        Ok(s) if s.success() => {
+            // Liste les fichiers créés
+            let paths = fs::read_dir(output_dir)
+                .map_err(|e| e.to_string())?
+                .filter_map(|entry| {
+                    entry.ok().and_then(|e| {
+                        let path = e.path();
+                        if path.extension()? == "pdf" {
+                            Some(path.to_string_lossy().to_string())
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect();
+            Ok(paths)
+        }
+        _ => Err("Échec de la division du PDF".to_string())
+    }
+}
+
+/// **NOUVELLE FONCTION** : Fusionne plusieurs PDFs en un seul
+pub fn pdf_merge(inputs: &[&Path], output: &str) -> bool {
+    let mut cmd = Command::new("pdftk");
+    
+    for input in inputs {
+        cmd.arg(input.to_str().unwrap());
+    }
+    
+    cmd.arg("cat")
+        .arg("output")
+        .arg(output);
+    
+    let status = cmd.status();
+    status.map(|s| s.success()).unwrap_or(false)
+}
+
+/// **NOUVELLE FONCTION** : Pivote les pages d'un PDF
+pub fn pdf_rotate(input: &Path, output: &str, rotation: u16, pages: Option<&str>) -> bool {
+    // rotation: 90, 180, 270
+    // pages: "1-end", "1-3", "even", "odd", etc.
+    let pages_spec = pages.unwrap_or("1-end");
+    let rotate_cmd = match rotation {
+        90 => "east",
+        180 => "south",
+        270 => "west",
+        _ => "north",
+    };
+    
+    let status = Command::new("pdftk")
+        .arg(input.to_str().unwrap())
+        .arg("cat")
+        .arg(format!("{}{}", pages_spec, rotate_cmd))
+        .arg("output")
+        .arg(output)
+        .status();
+    
+    status.map(|s| s.success()).unwrap_or(false)
+}
+
 /// **NOUVELLE FONCTION** : Détecte automatiquement le format depuis l'extension
 pub fn detecter_format_entree(path: &Path) -> Option<FormatEntree> {
     path.extension()?.to_str().and_then(|ext| match ext.to_lowercase().as_str() {
@@ -165,6 +268,7 @@ pub fn detecter_format_entree(path: &Path) -> Option<FormatEntree> {
         "html" | "htm" => Some(FormatEntree::Html),
         "tex" => Some(FormatEntree::Tex),
         "rst" => Some(FormatEntree::Rst),
+        "pdf" => Some(FormatEntree::Pdf),
         _ => None,
     })
 }
@@ -179,6 +283,7 @@ pub fn detecter_format_sortie(output: &str) -> Option<FormatSortie> {
         "odt" => Some(FormatSortie::Odt),
         "tex" => Some(FormatSortie::Tex),
         "txt" => Some(FormatSortie::Plain),
+        "pdf" => Some(FormatSortie::Pdf),
         _ => None,
     })
 }

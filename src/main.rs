@@ -1,5 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+// Version du package depuis Cargo.toml
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 mod modules;
 use eframe::egui;
 use std::path::{Path, PathBuf};
@@ -82,6 +85,10 @@ struct OxyonApp {
     resize_width: String,
     resize_height: String,
     resize_max_kb: String,
+    // Options Doc
+    doc_action: String, // "convert", "pdf_split", "pdf_merge", "pdf_rotate"
+    pdf_rotation_angle: u16,
+    pdf_pages_spec: String,
 }
 
 impl Default for OxyonApp {
@@ -121,6 +128,9 @@ impl Default for OxyonApp {
             resize_width: String::new(),
             resize_height: String::new(),
             resize_max_kb: String::new(),
+            doc_action: "convert".into(),
+            pdf_rotation_angle: 90,
+            pdf_pages_spec: "1-end".into(),
         }
     }
 }
@@ -344,6 +354,12 @@ impl OxyonApp {
         let resize_h = self.resize_height.parse::<u32>().unwrap_or(0);
         let resize_kb = self.resize_max_kb.parse::<u32>().unwrap_or(0);
         
+        // Copier les paramètres Doc
+        let doc_action = self.doc_action.clone();
+        let pdf_angle = self.pdf_rotation_angle;
+        let pdf_pages = self.pdf_pages_spec.clone();
+        let pdf_merge_list = self.current_files.clone();
+        
         let status_arc = Arc::clone(&self.status);
         *self.status.lock().unwrap() = "🚀 Action en cours...".into();
 
@@ -373,7 +389,33 @@ impl OxyonApp {
                     let success = match module {
                         #[cfg(feature = "api")]
                         ModuleType::Archive => modules::archive::compresser(&input, &out_str, &fmt),
-                        ModuleType::Doc => modules::doc::convertir(&input, &out_str),
+                        ModuleType::Doc => {
+                            match doc_action.as_str() {
+                                "convert" => {
+                                    let format_entree = modules::doc::detecter_format_entree(&input);
+                                    let format_sortie = modules::doc::detecter_format_sortie(&out_str);
+                                    modules::doc::convertir_avec_formats(&input, &out_str, format_entree, format_sortie)
+                                },
+                                "pdf_split" => {
+                                    let output_dir = input.parent().unwrap().join(format!(
+                                        "{}_pages",
+                                        input.file_stem().unwrap_or_default().to_string_lossy()
+                                    ));
+                                    std::fs::create_dir_all(&output_dir).ok();
+                                    modules::doc::pdf_split(&input, output_dir.to_str().unwrap()).is_ok()
+                                },
+                                "pdf_merge" => {
+                                    let paths: Vec<&Path> = pdf_merge_list.iter().map(|p| p.as_path()).collect();
+                                    let output = input.parent().unwrap().join("merged_oxyon.pdf");
+                                    modules::doc::pdf_merge(&paths, output.to_str().unwrap())
+                                },
+                                "pdf_rotate" => {
+                                    let pages_opt = if pdf_pages == "1-end" { None } else { Some(pdf_pages.as_str()) };
+                                    modules::doc::pdf_rotate(&input, &out_str, pdf_angle, pages_opt)
+                                },
+                                _ => modules::doc::convertir(&input, &out_str),
+                            }
+                        },
                         ModuleType::Image => {
                             match img_action.as_str() {
                                 "convert" => modules::pic::compresser(&input, &out_str, ratio),
@@ -449,7 +491,7 @@ impl eframe::App for OxyonApp {
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.vertical_centered(|ui| ui.heading("OXYON"));
+            ui.vertical_centered(|ui| ui.heading(format!("OXYON v{}", VERSION)));
 
             if !self.deps_manquantes.is_empty() {
                 ui.colored_label(egui::Color32::RED, format!("⚠️ Manquant : {}", self.deps_manquantes.join(", ")));
@@ -515,16 +557,61 @@ impl eframe::App for OxyonApp {
                     }
                 },
                 ModuleType::Doc => {
+                    // Sélecteur d'action
                     ui.horizontal(|ui| {
-                        ui.label("Format :");
-                        egui::ComboBox::from_id_salt("dfmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
-                            for f in ["docx","html","md","nfo","odt","tex","txt"] { 
-                                ui.selectable_value(&mut self.format_choisi, f.into(), f);
-                            }
+                        ui.label("Action :");
+                        egui::ComboBox::from_id_salt("doc_action").selected_text(&self.doc_action).show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.doc_action, "convert".into(), "Convert");
+                            ui.selectable_value(&mut self.doc_action, "pdf_split".into(), "PDF Split");
+                            ui.selectable_value(&mut self.doc_action, "pdf_merge".into(), "PDF Merge");
+                            ui.selectable_value(&mut self.doc_action, "pdf_rotate".into(), "PDF Rotate");
                         });
                     });
-                    if ui.checkbox(&mut self.save_doc_format, "💾 Sauvegarder ce format").changed() {
-                        self.save_config();
+                    
+                    ui.separator();
+                    
+                    // Options selon l'action choisie
+                    match self.doc_action.as_str() {
+                        "convert" => {
+                            ui.horizontal(|ui| {
+                                ui.label("Format :");
+                                egui::ComboBox::from_id_salt("dfmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
+                                    for f in ["docx","html","md","odt","tex","txt","pdf"] { 
+                                        ui.selectable_value(&mut self.format_choisi, f.into(), f);
+                                    }
+                                });
+                            });
+                            if ui.checkbox(&mut self.save_doc_format, "💾 Sauvegarder ce format").changed() {
+                                self.save_config();
+                            }
+                        },
+                        "pdf_split" => {
+                            ui.label("📄 Divise le PDF en pages individuelles");
+                            ui.label("Les pages seront créées dans un sous-dossier");
+                        },
+                        "pdf_merge" => {
+                            ui.label("📦 Fusionne plusieurs PDFs");
+                            ui.label("Ajoutez plusieurs fichiers PDF via drag & drop");
+                            if !self.current_files.is_empty() {
+                                ui.label(format!("Fichiers à fusionner : {}", self.current_files.len()));
+                            }
+                        },
+                        "pdf_rotate" => {
+                            ui.horizontal(|ui| {
+                                ui.label("Angle :");
+                                egui::ComboBox::from_id_salt("pdf_rot_angle").selected_text(format!("{}°", self.pdf_rotation_angle)).show_ui(ui, |ui| {
+                                    ui.selectable_value(&mut self.pdf_rotation_angle, 90, "90°");
+                                    ui.selectable_value(&mut self.pdf_rotation_angle, 180, "180°");
+                                    ui.selectable_value(&mut self.pdf_rotation_angle, 270, "270°");
+                                });
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Pages :");
+                                ui.text_edit_singleline(&mut self.pdf_pages_spec);
+                                ui.label("(ex: 1-end, 1-3, even, odd)");
+                            });
+                        },
+                        _ => {}
                     }
                 },
                 ModuleType::Image => {
@@ -728,7 +815,7 @@ fn main() -> eframe::Result {
     }
     
     let result = eframe::run_native(
-        "OXYON",
+        &format!("OXYON v{}", VERSION),
         options,
         Box::new(|cc| {
             let mut app = OxyonApp::default();

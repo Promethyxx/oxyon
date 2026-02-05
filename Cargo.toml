@@ -1,28 +1,29 @@
 [package]
 name = "oxyon"
-version = "1.0.8"
+version = "1.1.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 
 [dependencies]
 chrono = "0.4.43"
+dotenvy = "0.15"
 eframe = "0.29"
-image = { version = "0.25", features = ["avif", "exr", "png", "tiff", "webp", "gif", "ico", "hdr", "jpeg"] }
+image = { version = "0.25", features = ["avif", "exr", "gif", "hdr", "ico", "jpeg", "png", "tiff", "webp"] }
 kamadak-exif = "0.5"
+lopdf = "0.32"
 psd = "0.3"
-rawloader = "0.37"
-resvg = "0.44"
-tiny-skia = "0.11"
-usvg = "0.44"
 quick-xml = "0.39.0"
+rawloader = "0.37"
 regex = "1.10"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
+resvg = "0.44"
 rfd = "0.17.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+tiny-skia = "0.11"
 toml = "0.8"
+usvg = "0.44"
 which = "8.0.0"
-dotenvy = "0.15"
 
 [build-dependencies]
 winres = "0.1"
