@@ -343,7 +343,7 @@ impl OxyonApp {
                         #[cfg(feature = "api")]
                         ModuleType::Archive => modules::archive::compresser(&input, &out_str, &fmt),
                         ModuleType::Doc => modules::doc::convertir(&input, &out_str),
-                        ModuleType::Image => modules::image::compresser(&input, &out_str, ratio),
+                        ModuleType::Image => modules::pic::compresser(&input, &out_str, ratio),
                         _ => true,
                     };
 
@@ -470,7 +470,7 @@ impl eframe::App for OxyonApp {
                     ui.horizontal(|ui| {
                         ui.label("Format :");
                         egui::ComboBox::from_id_salt("ifmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
-                            for f in ["GIF","JPG","PNG","WebP"] { 
+                            for f in ["AVIF","DNG","EXR","GIF","HDR","HEIC","ICO","JPG","JXL","PNG","PSD","RAW","SVG","TIFF","WebP"] { 
                                 ui.selectable_value(&mut self.format_choisi, f.into(), f);
                             }
                         });

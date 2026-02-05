@@ -1,14 +1,19 @@
 [package]
 name = "oxyon"
-version = "1.0.5"
+version = "1.0.6"
 edition = "2024"
 license = "GPL-3.0-or-later"
 
 [dependencies]
 chrono = "0.4.43"
 eframe = "0.29"
-image = "0.25"
+image = { version = "0.25", features = ["avif", "exr", "png", "tiff", "webp", "gif", "ico", "hdr", "jpeg"] }
 kamadak-exif = "0.5"
+psd = "0.3"
+rawloader = "0.37"
+resvg = "0.44"
+tiny-skia = "0.11"
+usvg = "0.44"
 quick-xml = "0.39.0"
 regex = "1.10"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
