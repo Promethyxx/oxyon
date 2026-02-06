@@ -1,6 +1,9 @@
 # Rust
 /target
 /tests
+/bin linux ARM
+/bin linux X64
+/bin mac ARM
 **/*.rs.bk
 
 # Archives

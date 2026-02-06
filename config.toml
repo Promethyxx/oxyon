@@ -4,5 +4,8 @@ theme = "Auto"
 [image]
 ratio_img = 3
 
+[performance]
+max_parallel_jobs = 4
+
 [video]
 copie_flux = false

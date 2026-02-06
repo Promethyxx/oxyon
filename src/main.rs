@@ -88,6 +88,28 @@ struct OxyonApp {
     doc_action: String,
     pdf_rotation_angle: u16,
     pdf_pages_spec: String,
+    // PDF Crop (pourcentages)
+    pdf_crop_x: f64,
+    pdf_crop_y: f64,
+    pdf_crop_w: f64,
+    pdf_crop_h: f64,
+    // PDF Page Numbers
+    pdf_num_debut: u32,
+    pdf_num_position: String,
+    pdf_num_taille: f64,
+    // PDF Protect
+    pdf_owner_pass: String,
+    pdf_user_pass: String,
+    pdf_allow_print: bool,
+    pdf_allow_copy: bool,
+    // PDF Unlock
+    pdf_unlock_pass: String,
+    // PDF Watermark
+    pdf_wm_texte: String,
+    pdf_wm_taille: f64,
+    pdf_wm_opacite: f64,
+    // PDF Organize
+    pdf_nouvel_ordre: String,
     // Waitlist et parallélisation
     max_parallel_jobs: usize,
     active_jobs: Arc<Mutex<usize>>,
@@ -136,6 +158,22 @@ impl Default for OxyonApp {
             doc_action: "convert".into(),
             pdf_rotation_angle: 90,
             pdf_pages_spec: "1-end".into(),
+            pdf_crop_x: 0.0,
+            pdf_crop_y: 0.0,
+            pdf_crop_w: 100.0,
+            pdf_crop_h: 100.0,
+            pdf_num_debut: 1,
+            pdf_num_position: "BasCentre".into(),
+            pdf_num_taille: 10.0,
+            pdf_owner_pass: String::new(),
+            pdf_user_pass: String::new(),
+            pdf_allow_print: true,
+            pdf_allow_copy: true,
+            pdf_unlock_pass: String::new(),
+            pdf_wm_texte: "CONFIDENTIEL".into(),
+            pdf_wm_taille: 60.0,
+            pdf_wm_opacite: 0.15,
+            pdf_nouvel_ordre: String::new(),
             max_parallel_jobs: 4,
             active_jobs: Arc::new(Mutex::new(0)),
             completed_jobs: Arc::new(Mutex::new(0)),
@@ -368,6 +406,22 @@ impl OxyonApp {
         let pdf_angle = self.pdf_rotation_angle;
         let pdf_pages = self.pdf_pages_spec.clone();
         let pdf_merge_list = self.current_files.clone();
+        let pdf_crop_x = self.pdf_crop_x;
+        let pdf_crop_y = self.pdf_crop_y;
+        let pdf_crop_w = self.pdf_crop_w;
+        let pdf_crop_h = self.pdf_crop_h;
+        let pdf_num_debut = self.pdf_num_debut;
+        let pdf_num_position = self.pdf_num_position.clone();
+        let pdf_num_taille = self.pdf_num_taille;
+        let pdf_owner_pass = self.pdf_owner_pass.clone();
+        let pdf_user_pass = self.pdf_user_pass.clone();
+        let pdf_allow_print = self.pdf_allow_print;
+        let pdf_allow_copy = self.pdf_allow_copy;
+        let pdf_unlock_pass = self.pdf_unlock_pass.clone();
+        let pdf_wm_texte = self.pdf_wm_texte.clone();
+        let pdf_wm_taille = self.pdf_wm_taille;
+        let pdf_wm_opacite = self.pdf_wm_opacite;
+        let pdf_nouvel_ordre = self.pdf_nouvel_ordre.clone();
         
         std::thread::spawn(move || {
             loop {
@@ -383,10 +437,16 @@ impl OxyonApp {
                 
                 *active.lock().unwrap() += 1;
                 
+                let effective_fmt = if module == ModuleType::Doc && doc_action != "convert" {
+                    "pdf".to_string()
+                } else {
+                    fmt.clone()
+                };
+                
                 let output = input.parent().unwrap().join(format!(
                     "{}_oxyon.{}",
                     input.file_stem().unwrap_or_default().to_string_lossy(),
-                    fmt
+                    effective_fmt
                 ));
                 let out_str = output.to_str().unwrap().to_string();
                 
@@ -434,11 +494,56 @@ impl OxyonApp {
                             "pdf_merge" => {
                                 let paths: Vec<&Path> = pdf_merge_list.iter().map(|p| p.as_path()).collect();
                                 let output_merge = input.parent().unwrap().join("merged_oxyon.pdf");
-                                modules::doc::pdf_merge(&paths, output_merge.to_str().unwrap())
+                                modules::doc::pdf_merge(&paths, output_merge.to_str().unwrap()).is_ok()
                             },
                             "pdf_rotate" => {
-                                let pages_opt = if pdf_pages == "1-end" { None } else { Some(pdf_pages.as_str()) };
-                                modules::doc::pdf_rotate(&input, &out_str, pdf_angle, pages_opt)
+                                let pages_opt = parse_pages_spec(&pdf_pages);
+                                modules::doc::pdf_rotate(&input, &out_str, pdf_angle, pages_opt.as_deref()).is_ok()
+                            },
+                            "pdf_compress" => {
+                                modules::doc::pdf_compresser(&input, &out_str).is_ok()
+                            },
+                            "pdf_crop" => {
+                                let pages_opt = parse_pages_spec(&pdf_pages);
+                                modules::doc::pdf_crop(&input, &out_str, pdf_crop_x, pdf_crop_y, pdf_crop_w, pdf_crop_h, pages_opt.as_deref()).is_ok()
+                            },
+                            "pdf_organize" => {
+                                let ordre: Vec<u32> = pdf_nouvel_ordre.split(',')
+                                    .filter_map(|s| s.trim().parse::<u32>().ok())
+                                    .collect();
+                                if ordre.is_empty() { false }
+                                else { modules::doc::pdf_organiser(&input, &out_str, &ordre).is_ok() }
+                            },
+                            "pdf_delete_pages" => {
+                                let pages_a_sup: Vec<u32> = pdf_pages.split(',')
+                                    .filter_map(|s| s.trim().parse::<u32>().ok())
+                                    .collect();
+                                if pages_a_sup.is_empty() { false }
+                                else { modules::doc::pdf_supprimer_pages(&input, &out_str, &pages_a_sup).is_ok() }
+                            },
+                            "pdf_numbers" => {
+                                let position = match pdf_num_position.as_str() {
+                                    "BasGauche"  => modules::doc::PositionNumero::BasGauche,
+                                    "BasDroite"  => modules::doc::PositionNumero::BasDroite,
+                                    "HautCentre" => modules::doc::PositionNumero::HautCentre,
+                                    "HautGauche" => modules::doc::PositionNumero::HautGauche,
+                                    "HautDroite" => modules::doc::PositionNumero::HautDroite,
+                                    _            => modules::doc::PositionNumero::BasCentre,
+                                };
+                                modules::doc::pdf_numeroter(&input, &out_str, pdf_num_debut, position, pdf_num_taille).is_ok()
+                            },
+                            "pdf_protect" => {
+                                modules::doc::pdf_proteger(&input, &out_str, &pdf_owner_pass, &pdf_user_pass, pdf_allow_print, pdf_allow_copy).is_ok()
+                            },
+                            "pdf_unlock" => {
+                                modules::doc::pdf_dechiffrer(&input, &out_str, &pdf_unlock_pass).is_ok()
+                            },
+                            "pdf_repair" => {
+                                modules::doc::pdf_reparer(&input, &out_str).is_ok()
+                            },
+                            "pdf_watermark" => {
+                                let pages_opt = parse_pages_spec(&pdf_pages);
+                                modules::doc::pdf_watermark(&input, &out_str, &pdf_wm_texte, pdf_wm_taille, pdf_wm_opacite, pages_opt.as_deref()).is_ok()
                             },
                             _ => modules::doc::convertir(&input, &out_str),
                         }
@@ -592,10 +697,19 @@ impl eframe::App for OxyonApp {
                     ui.horizontal(|ui| {
                         ui.label("Action :");
                         egui::ComboBox::from_id_salt("doc_action").selected_text(&self.doc_action).show_ui(ui, |ui| {
-                            ui.selectable_value(&mut self.doc_action, "convert".into(), "Convert");
-                            ui.selectable_value(&mut self.doc_action, "pdf_split".into(), "PDF Split");
-                            ui.selectable_value(&mut self.doc_action, "pdf_merge".into(), "PDF Merge");
-                            ui.selectable_value(&mut self.doc_action, "pdf_rotate".into(), "PDF Rotate");
+                            ui.selectable_value(&mut self.doc_action, "convert".into(), "📄 Convert");
+                            ui.selectable_value(&mut self.doc_action, "pdf_split".into(), "✂️ Split");
+                            ui.selectable_value(&mut self.doc_action, "pdf_merge".into(), "📦 Merge");
+                            ui.selectable_value(&mut self.doc_action, "pdf_rotate".into(), "🔄 Rotate");
+                            ui.selectable_value(&mut self.doc_action, "pdf_compress".into(), "🗜️ Compress");
+                            ui.selectable_value(&mut self.doc_action, "pdf_crop".into(), "✂️ Crop");
+                            ui.selectable_value(&mut self.doc_action, "pdf_organize".into(), "🔀 Organize");
+                            ui.selectable_value(&mut self.doc_action, "pdf_delete_pages".into(), "🗑️ Delete Pages");
+                            ui.selectable_value(&mut self.doc_action, "pdf_numbers".into(), "🔢 Page Numbers");
+                            ui.selectable_value(&mut self.doc_action, "pdf_protect".into(), "🔒 Protect");
+                            ui.selectable_value(&mut self.doc_action, "pdf_unlock".into(), "🔓 Unlock");
+                            ui.selectable_value(&mut self.doc_action, "pdf_repair".into(), "🔧 Repair");
+                            ui.selectable_value(&mut self.doc_action, "pdf_watermark".into(), "💧 Watermark");
                         });
                     });
                     
@@ -616,17 +730,20 @@ impl eframe::App for OxyonApp {
                             }
                         },
                         "pdf_split" => {
-                            ui.label("📄 Divise le PDF en pages individuelles");
-                            ui.label("Les pages seront créées dans un sous-dossier");
+                            ui.label("✂️ Divise le document en pages individuelles");
+                            ui.label("Les pages seront créées dans un sous-dossier (PDF)");
+                            ui.label("💡 Formats non-PDF : convertis en PDF avant le split");
                         },
                         "pdf_merge" => {
-                            ui.label("📦 Fusionne plusieurs PDFs");
-                            ui.label("Ajoutez plusieurs fichiers PDF via drag & drop");
+                            ui.label("📦 Fusionne plusieurs documents");
+                            ui.label("Ajoutez plusieurs fichiers via drag & drop");
+                            ui.label("💡 Mixez PDF, DOCX, ODT, MD, HTML...");
                             if !self.current_files.is_empty() {
                                 ui.label(format!("Fichiers à fusionner : {}", self.current_files.len()));
                             }
                         },
                         "pdf_rotate" => {
+                            ui.label("💡 Fonctionne sur tous les formats du module Doc");
                             ui.horizontal(|ui| {
                                 ui.label("Angle :");
                                 egui::ComboBox::from_id_salt("pdf_rot_angle").selected_text(format!("{}°", self.pdf_rotation_angle)).show_ui(ui, |ui| {
@@ -638,7 +755,120 @@ impl eframe::App for OxyonApp {
                             ui.horizontal(|ui| {
                                 ui.label("Pages :");
                                 ui.text_edit_singleline(&mut self.pdf_pages_spec);
-                                ui.label("(ex: 1-end, 1-3, even, odd)");
+                                ui.label("(ex: 1,3,5 ou vide = toutes)");
+                            });
+                        },
+                        "pdf_compress" => {
+                            ui.label("🗜️ Compresse le document (object streams + compression max)");
+                            ui.label("Réduit la taille de 11-60% selon le contenu");
+                            ui.label("💡 Formats non-PDF : convertis en PDF pour compression optimale");
+                        },
+                        "pdf_crop" => {
+                            ui.label("✂️ Recadrage en pourcentage (0-100) :");
+                            ui.label("💡 Fonctionne aussi sur DOCX, ODT, HTML... (via conversion)");
+                            ui.horizontal(|ui| {
+                                ui.label("X:");
+                                ui.add(egui::Slider::new(&mut self.pdf_crop_x, 0.0..=100.0).fixed_decimals(1));
+                                ui.label("Y:");
+                                ui.add(egui::Slider::new(&mut self.pdf_crop_y, 0.0..=100.0).fixed_decimals(1));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Largeur:");
+                                ui.add(egui::Slider::new(&mut self.pdf_crop_w, 1.0..=100.0).fixed_decimals(1));
+                                ui.label("Hauteur:");
+                                ui.add(egui::Slider::new(&mut self.pdf_crop_h, 1.0..=100.0).fixed_decimals(1));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Pages :");
+                                ui.text_edit_singleline(&mut self.pdf_pages_spec);
+                                ui.label("(ex: 1,3,5 ou vide = toutes)");
+                            });
+                        },
+                        "pdf_organize" => {
+                            ui.label("🔀 Réorganise les pages du document");
+                            ui.label("💡 Fonctionne sur tous les formats du module Doc");
+                            ui.horizontal(|ui| {
+                                ui.label("Nouvel ordre :");
+                                ui.text_edit_singleline(&mut self.pdf_nouvel_ordre);
+                                ui.label("(ex: 3,1,2,5,4)");
+                            });
+                        },
+                        "pdf_delete_pages" => {
+                            ui.label("🗑️ Supprime des pages du document");
+                            ui.horizontal(|ui| {
+                                ui.label("Pages à supprimer :");
+                                ui.text_edit_singleline(&mut self.pdf_pages_spec);
+                                ui.label("(ex: 2,4,6)");
+                            });
+                        },
+                        "pdf_numbers" => {
+                            ui.label("🔢 Ajoute des numéros de page");
+                            ui.label("💡 Fonctionne sur tous les formats du module Doc");
+                            ui.horizontal(|ui| {
+                                ui.label("Début :");
+                                ui.add(egui::DragValue::new(&mut self.pdf_num_debut).range(1..=9999));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Position :");
+                                egui::ComboBox::from_id_salt("pdf_num_pos").selected_text(&self.pdf_num_position).show_ui(ui, |ui| {
+                                    ui.selectable_value(&mut self.pdf_num_position, "BasCentre".into(), "Bas Centre");
+                                    ui.selectable_value(&mut self.pdf_num_position, "BasGauche".into(), "Bas Gauche");
+                                    ui.selectable_value(&mut self.pdf_num_position, "BasDroite".into(), "Bas Droite");
+                                    ui.selectable_value(&mut self.pdf_num_position, "HautCentre".into(), "Haut Centre");
+                                    ui.selectable_value(&mut self.pdf_num_position, "HautGauche".into(), "Haut Gauche");
+                                    ui.selectable_value(&mut self.pdf_num_position, "HautDroite".into(), "Haut Droite");
+                                });
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Taille police :");
+                                ui.add(egui::Slider::new(&mut self.pdf_num_taille, 6.0..=36.0).fixed_decimals(0));
+                            });
+                        },
+                        "pdf_protect" => {
+                            ui.label("🔒 Chiffre le document avec mot de passe (AES-128)");
+                            ui.label("💡 Formats non-PDF convertis en PDF avant chiffrement");
+                            ui.horizontal(|ui| {
+                                ui.label("Mot de passe propriétaire :");
+                                ui.add(egui::TextEdit::singleline(&mut self.pdf_owner_pass).password(true));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Mot de passe utilisateur :");
+                                ui.add(egui::TextEdit::singleline(&mut self.pdf_user_pass).password(true));
+                            });
+                            ui.checkbox(&mut self.pdf_allow_print, "Autoriser l'impression");
+                            ui.checkbox(&mut self.pdf_allow_copy, "Autoriser la copie");
+                        },
+                        "pdf_unlock" => {
+                            ui.label("🔓 Déchiffre un document protégé (PDF uniquement)");
+                            ui.horizontal(|ui| {
+                                ui.label("Mot de passe :");
+                                ui.add(egui::TextEdit::singleline(&mut self.pdf_unlock_pass).password(true));
+                            });
+                        },
+                        "pdf_repair" => {
+                            ui.label("🔧 Tente de réparer un document corrompu");
+                            ui.label("Supprime les objets orphelins, recompresse, renumérate");
+                            ui.label("💡 Fonctionne sur tous les formats du module Doc");
+                        },
+                        "pdf_watermark" => {
+                            ui.label("💧 Ajoute un filigrane texte diagonal");
+                            ui.label("💡 Fonctionne sur tous les formats du module Doc");
+                            ui.horizontal(|ui| {
+                                ui.label("Texte :");
+                                ui.text_edit_singleline(&mut self.pdf_wm_texte);
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Taille :");
+                                ui.add(egui::Slider::new(&mut self.pdf_wm_taille, 12.0..=120.0).fixed_decimals(0));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Opacité :");
+                                ui.add(egui::Slider::new(&mut self.pdf_wm_opacite, 0.05..=1.0).fixed_decimals(2));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Pages :");
+                                ui.text_edit_singleline(&mut self.pdf_pages_spec);
+                                ui.label("(ex: 1,3,5 ou vide = toutes)");
                             });
                         },
                         _ => {}
@@ -857,6 +1087,18 @@ impl eframe::App for OxyonApp {
             if !self.current_files.is_empty() { if ui.button("🗑️ Tout effacer").clicked() { self.current_files.clear(); } }
         });
     }
+}
+
+/// Parse une spec de pages "1,3,5" en Vec<u32>, retourne None si vide ou "1-end"
+fn parse_pages_spec(spec: &str) -> Option<Vec<u32>> {
+    let trimmed = spec.trim();
+    if trimmed.is_empty() || trimmed == "1-end" {
+        return None;
+    }
+    let pages: Vec<u32> = trimmed.split(',')
+        .filter_map(|s| s.trim().parse::<u32>().ok())
+        .collect();
+    if pages.is_empty() { None } else { Some(pages) }
 }
 
 fn main() -> eframe::Result {
