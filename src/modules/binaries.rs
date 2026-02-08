@@ -10,7 +10,6 @@ pub fn extraire_deps() -> Result<(), String> {
         std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
     }
 
-    // On extrait un par un au lieu de faire un gros tableau global
     let f = |name: &str, bytes: &[u8]| -> Result<(), String> {
         let path = temp_dir.join(name);
         if !path.exists() {
@@ -22,26 +21,18 @@ pub fn extraire_deps() -> Result<(), String> {
     f("ffmpeg.exe", include_bytes!("../../bin/ffmpeg.exe"))?;
     f("ffprobe.exe", include_bytes!("../../bin/ffprobe.exe"))?;
     f("mkvpropedit.exe", include_bytes!("../../bin/mkvpropedit.exe"))?;
-    f("7za.exe", include_bytes!("../../bin/7za.exe"))?;
     f("pandoc.exe", include_bytes!("../../bin/pandoc.exe"))?;
 
-    // Stocker le chemin du dossier temp
     TOOLS_DIR.set(temp_dir).ok();
-
     Ok(())
 }
 
-// Fonctions publiques pour récupérer les chemins
 pub fn get_ffmpeg() -> PathBuf {
     TOOLS_DIR.get().expect("extraire_deps doit être appelé d'abord").join("ffmpeg.exe")
 }
 
 pub fn get_ffprobe() -> PathBuf {
     TOOLS_DIR.get().expect("extraire_deps doit être appelé d'abord").join("ffprobe.exe")
-}
-
-pub fn get_7z() -> PathBuf {
-    TOOLS_DIR.get().expect("extraire_deps doit être appelé d'abord").join("7za.exe")
 }
 
 pub fn get_pandoc() -> PathBuf {
