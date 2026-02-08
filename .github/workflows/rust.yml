@@ -1,4 +1,5 @@
 name: Rust CI/CD
+
 on:
   push:
     branches: [ "main" ]
@@ -11,55 +12,63 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
-    
-    - name: Download binaries
+
+    - name: Cache Cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    # Download build dependencies from the manually managed "assets" release
+    - name: Download assets
       run: |
         New-Item -ItemType Directory -Force -Path bin
-        gh release download --pattern "*.exe" --dir bin --repo ${{ github.repository }}
+        gh release download assets --pattern "*.exe" --dir bin --repo ${{ github.repository }}
+        Write-Host "Assets downloaded:"
+        Get-ChildItem bin/*.exe | ForEach-Object { Write-Host "  - $($_.Name) ($([math]::Round($_.Length/1MB, 1)) MB)" }
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: pwsh
-      continue-on-error: true
-    
-    # NETTOYAGE INTÉGRAL DES ANCIENNES VERSIONS
-    - name: Cleanup old versions
-      run: |
-        $old_files = @("bin/oxyon.exe", "bin/oxyon-full.exe", "bin/oxyon-office.exe", "oxyon.exe", "oxyon-full.exe", "oxyon-office.exe")
-        foreach ($f in $old_files) {
-          if (Test-Path $f) { 
-            Remove-Item $f -Force
-            Write-Host "Nettoyé : $f"
-          }
-        }
-      shell: pwsh
 
-    # 1. BUILD VERSION COMPLÈTE
+    # Lint both versions before building (fail fast)
+    - name: Check warnings (full)
+      env:
+        RUSTFLAGS: "-D warnings"
+      run: cargo check --all-targets
+
+    - name: Check warnings (office)
+      env:
+        RUSTFLAGS: "-D warnings"
+      run: cargo check --all-targets --no-default-features
+
+    # Build full version (all features)
     - name: Build Full Version
-      run: cargo build --release --verbose
+      run: cargo build --release
 
     - name: Prepare Full Binary
       run: Copy-Item target/release/oxyon.exe oxyon-full.exe
       shell: pwsh
 
-    # 2. BUILD VERSION OFFICE (MINIMALE)
+    # Build office version (minimal)
     - name: Build Office Version
-      run: cargo build --release --no-default-features --verbose
+      run: cargo build --release --no-default-features
 
     - name: Prepare Office Binary
       run: Copy-Item target/release/oxyon.exe oxyon-office.exe
       shell: pwsh
 
-    - name: Check Warnings
-      env:
-        RUSTFLAGS: "-D warnings"
-      run: cargo check --all-targets
-
-    # DÉPLOIEMENT
+    # Deploy only oxyon binaries
     - name: Deploy Rolling Release
       uses: softprops/action-gh-release@v2
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -67,19 +76,14 @@ jobs:
         tag_name: latest
         body: |
           ### Available versions
-          - **oxyon-full.exe** : Complete version contains following modules: (Archives, Audio, Docs, Pictures, Scrap, Tag, Vidéo)
-          - **oxyon-office.exe** : Office version contains following modules: (Doc and Pictures)
-          
-          ###Assets (You don't need this)
-          - FFmpeg / FFprobe : [8.0.2]
-          - 7-Zip (7za) : [25.1]
-          - Pandoc : [3.8.3]
-          - Mkvpropedit : [97.0]
-          
-          *Last update the ${{ github.event.head_commit.timestamp }}*
+          - **oxyon-full.exe** : Complete version (Archives, Audio, Docs, Pictures, Scrap, Tag, Video)
+          - **oxyon-office.exe** : Office version (Docs, Pictures)
+
+          Tools required for compilation are available in the [`assets` release](../../releases/tag/assets).
+
+          *Last updated: ${{ github.event.head_commit.timestamp }}*
         files: |
           oxyon-full.exe
           oxyon-office.exe
-          bin/*.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
