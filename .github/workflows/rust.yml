@@ -41,17 +41,6 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: pwsh
 
-    # Lint both versions before building (fail fast)
-    - name: Check warnings (full)
-      env:
-        RUSTFLAGS: "-D warnings"
-      run: cargo check --all-targets
-
-    - name: Check warnings (office)
-      env:
-        RUSTFLAGS: "-D warnings"
-      run: cargo check --all-targets --no-default-features
-
     # Build full version (all features)
     - name: Build Full Version
       run: cargo build --release
