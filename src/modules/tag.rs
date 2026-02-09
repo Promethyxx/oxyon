@@ -38,7 +38,7 @@ pub fn lire_nfo(nfo_path: &Path) -> Result<HashMap<String, String>, String> {
     Ok(data)
 }
 
-/// Crée le fichier XML temporaire pour mkvpropedit (Logique Python)
+/// Crée le fichier XML temporaire pour mkvpropedit
 fn creer_xml_tags(tags: &HashMap<String, String>) -> String {
     let mut xml = String::from("<?xml version=\"1.0\"?>\n<Tags>\n  <Tag>\n    <Targets><TargetTypeValue>50</TargetTypeValue></Targets>\n");
     for (cle, valeur) in tags {
@@ -55,18 +55,14 @@ fn creer_xml_tags(tags: &HashMap<String, String>) -> String {
 
 /// 1. Marquer une vidéo comme 'VU'
 pub fn marquer_vu(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
-    // 1. On récupère TOUTES les données actuelles du NFO
     let mut data = lire_nfo(nfo_path)?;
-    
-    // 2. On calcule le nouveau playcount sans effacer le reste
+
     let pc = data.get("playcount").and_then(|v| v.parse::<u32>().ok()).unwrap_or(0) + 1;
-    
-    // 3. On met à jour uniquement les champs nécessaires dans le dictionnaire
+
     data.insert("playcount".to_string(), pc.to_string());
     data.insert("watched".to_string(), "true".to_string());
-    data.insert("COMMENT".to_string(), "VU".to_string());
+    data.insert("KEYWORDS".to_string(), "WATCHED".to_string());
 
-    // 4. On réécrit le NFO complet (avec les anciennes metas + les nouvelles infos VU)
     let mut file = File::create(nfo_path).map_err(|e| e.to_string())?;
     writeln!(file, "<movie>").map_err(|e| e.to_string())?;
     for (k, v) in &data {
@@ -74,7 +70,6 @@ pub fn marquer_vu(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
     }
     writeln!(file, "</movie>").map_err(|e| e.to_string())?;
 
-    // 5. On injecte TOUT le dictionnaire mis à jour dans le MKV via XML
     let xml_content = creer_xml_tags(&data);
     let temp_xml = "temp_vu.xml";
     std::fs::write(temp_xml, xml_content).map_err(|e| e.to_string())?;
@@ -87,7 +82,7 @@ pub fn marquer_vu(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
     if status.success() { Ok(()) } else { Err("Erreur marquage VU complet".into()) }
 }
 
-/// 2. Modification directe (Demandée par ton main.rs)
+/// 2. Modification directe
 pub fn modifier_tag(mkv_path: &Path, tag: &str, valeur: &str) -> Result<(), String> {
     let status = Command::new(binaries::get_mkvpropedit())
         .args([
@@ -102,12 +97,20 @@ pub fn modifier_tag(mkv_path: &Path, tag: &str, valeur: &str) -> Result<(), Stri
 /// 3. Injection complète depuis NFO
 pub fn appliquer_tags(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
     let mut tags = lire_nfo(nfo_path)?;
-    
-    // ON SUPPRIME tout ce qui touche au statut de lecture pour l'injection
+
+    // On supprime le statut de lecture pour ne pas l'écraser
     tags.remove("playcount");
     tags.remove("watched");
     tags.remove("watchedstatus");
-    tags.remove("COMMENT"); // Pour ne pas risquer d'injecter un ancien "VU"
+    tags.remove("KEYWORDS"); // Statut VU géré séparément
+
+    // Rating dans COMMENT
+    if let Some(rating) = tags.get("value").cloned() {
+        if let Ok(r) = rating.parse::<f64>() {
+            let rounded = (r * 10.0).round() / 10.0;
+            tags.insert("COMMENT".to_string(), format!("{} / 10", rounded));
+        }
+    }
 
     let xml_content = creer_xml_tags(&tags);
     let temp_xml = "temp_meta.xml";
@@ -132,10 +135,10 @@ pub fn ajouter_images_mkv(mkv_path: &Path) -> Result<(), String> {
     for entry in std::fs::read_dir(parent).map_err(|e| e.to_string())? {
         let path = entry.map_err(|e| e.to_string())?.path();
         let name = path.file_name().unwrap().to_string_lossy().to_lowercase();
-        
+
         if name.contains(&stem_mkv) && (name.contains("poster") || name.contains("fanart") || name.contains("clearlogo")) {
-            let attachment_name = if name.contains("poster") { "cover" } 
-                                 else if name.contains("fanart") { "fanart" } 
+            let attachment_name = if name.contains("poster") { "cover" }
+                                 else if name.contains("fanart") { "fanart" }
                                  else { "clearlogo" };
             let mime = if name.ends_with(".png") { "image/png" } else { "image/jpeg" };
 
@@ -153,12 +156,10 @@ pub fn ajouter_images_mkv(mkv_path: &Path) -> Result<(), String> {
 
 /// 5. Supprimer TOUS les tags et TOUTES les pièces jointes (Reset total)
 pub fn supprimer_tous_tags(mkv_path: &Path) -> Result<(), String> {
-    // 1. XML minimaliste pour dire "aucune balise"
     let xml_vide = "<?xml version=\"1.0\"?>\n<Tags>\n</Tags>";
     let temp_xml = "temp_reset.xml";
     std::fs::write(temp_xml, xml_vide).map_err(|e| e.to_string())?;
 
-    // 2. On injecte le vide + reset du titre et des images
     let status = Command::new(binaries::get_mkvpropedit())
         .args([
             mkv_path.to_str().unwrap(),

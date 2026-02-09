@@ -41,20 +41,20 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: pwsh
 
-    # Build full version (all features)
+    # Build full version (all features) — optimized for distribution
     - name: Build Full Version
-      run: cargo build --release
+      run: cargo build --profile dist
 
     - name: Prepare Full Binary
-      run: Copy-Item target/release/oxyon.exe oxyon-full.exe
+      run: Copy-Item target/dist/oxyon.exe oxyon-full.exe
       shell: pwsh
 
-    # Build office version (minimal)
+    # Build office version (minimal) — optimized for distribution
     - name: Build Office Version
-      run: cargo build --release --no-default-features
+      run: cargo build --profile dist --no-default-features
 
     - name: Prepare Office Binary
-      run: Copy-Item target/release/oxyon.exe oxyon-office.exe
+      run: Copy-Item target/dist/oxyon.exe oxyon-office.exe
       shell: pwsh
 
     # Deploy only oxyon binaries

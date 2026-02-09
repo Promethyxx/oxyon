@@ -1006,7 +1006,7 @@ impl eframe::App for OxyonApp {
                             if let Some(t) = &entry.texture { ui.image((t.id(), egui::vec2(50.0, 75.0))); }
                             ui.label(&entry.data.title);
                             if !self.current_files.is_empty() {
-                                if ui.button("Choisir").clicked() { modules::scrap::save_metadata(self.current_files[0].clone(), entry.data.clone(), true); }
+                                if ui.button("Choisir").clicked() { modules::scrap::save_metadata(self.current_files[0].clone(), entry.data.clone()); }
                             }
                         });
                     }

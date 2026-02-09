@@ -35,8 +35,14 @@ winres = "0.1"
 [profile.release]
 opt-level = 0
 lto = false
-codegen-units = 256 # Maximum de parallélisation
-strip = true  # Réduit la taille de l'exe
+codegen-units = 256
+strip = true
+
+[profile.dist]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1
 
 [features]
 default = ["api"]
