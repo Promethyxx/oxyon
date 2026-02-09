@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::OnceLock;
 
 // Cache global des chemins
@@ -25,6 +26,18 @@ pub fn extraire_deps() -> Result<(), String> {
 
     TOOLS_DIR.set(temp_dir).ok();
     Ok(())
+}
+
+/// Crée une Command silencieuse (pas de fenêtre CMD sur Windows)
+pub fn silent_cmd(program: PathBuf) -> Command {
+    let mut cmd = Command::new(program);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
 }
 
 pub fn get_ffmpeg() -> PathBuf {

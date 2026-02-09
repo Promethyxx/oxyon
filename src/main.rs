@@ -975,13 +975,10 @@ impl eframe::App for OxyonApp {
                 #[cfg(feature = "api")]
                 ModuleType::Scrapper => {
                     ui.horizontal(|ui| {
-                        if ui.button("🎬 Film").clicked() {
-                            let res_arc = Arc::clone(&self.results_ui);
-                            let stem = self.current_stem.clone();
-                            let ctx_c = ctx.clone();
+                        let search = |is_series: bool, res_arc: Arc<Mutex<Vec<ScrapeEntry>>>, stem: String, ctx_c: egui::Context| {
                             res_arc.lock().unwrap().clear();
                             std::thread::spawn(move || {
-                                if let Ok(results) = modules::scrap::search_tmdb(&stem, false) {
+                                if let Ok(results) = modules::scrap::search_tmdb(&stem, is_series) {
                                     for r in results {
                                         let tex = r.poster_path.as_ref()
                                             .and_then(|p| modules::scrap::download_image_bytes(p))
@@ -998,6 +995,12 @@ impl eframe::App for OxyonApp {
                                     }
                                 }
                             });
+                        };
+                        if ui.button("🎬 Film").clicked() {
+                            search(false, Arc::clone(&self.results_ui), self.current_stem.clone(), ctx.clone());
+                        }
+                        if ui.button("📺 Série").clicked() {
+                            search(true, Arc::clone(&self.results_ui), self.current_stem.clone(), ctx.clone());
                         }
                     });
                     let entries = self.results_ui.lock().unwrap().clone();
@@ -1070,18 +1073,19 @@ impl eframe::App for OxyonApp {
             if self.current_files.is_empty() { ui.centered_and_justified(|ui| { ui.label("📥 Glissez vos fichiers ici"); }); }
             ui.add_space(10.0);
             ui.vertical_centered(|ui| { 
-                ui.heading(&*self.status.lock().unwrap()); 
-                
-                let active = *self.active_jobs.lock().unwrap();
                 let completed = *self.completed_jobs.lock().unwrap();
                 let total = *self.total_jobs.lock().unwrap();
-                let queue_len = self.job_queue.lock().unwrap().len();
                 
                 if total > 0 && completed < total {
-                    ui.label(format!("⚙️ Actifs: {} | ✅ Terminés: {} | 📋 En attente: {}", active, completed, queue_len));
-                    
-                    let progress = completed as f32 / total as f32;
-                    ui.add(egui::ProgressBar::new(progress).show_percentage());
+                    let active = *self.active_jobs.lock().unwrap();
+                    let pct = (completed as f32 / total as f32 * 100.0).round() as u32;
+                    ui.heading(format!("⚙️ {}/{} fichiers ({}%)", completed, total, pct));
+                    ui.add(egui::ProgressBar::new(completed as f32 / total as f32).animate(true));
+                    ui.small(format!("{} actifs · {} en attente", active, self.job_queue.lock().unwrap().len()));
+                } else if total > 0 && completed >= total {
+                    ui.heading(format!("✅ Terminé — {} fichiers traités", total));
+                } else {
+                    ui.heading(&*self.status.lock().unwrap());
                 }
             });
             if !self.current_files.is_empty() { if ui.button("🗑️ Tout effacer").clicked() { self.current_files.clear(); } }

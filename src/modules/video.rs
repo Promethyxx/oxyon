@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use std::path::PathBuf;
-use std::process::{Child, Command};
+use std::process::Child;
 use crate::modules::binaries;
 
 /// Convertit ou change le conteneur d'une vidéo
@@ -20,17 +20,16 @@ pub fn traiter_video(
         }
     } else if est_audio_uniquement {
         args.push("-vn");
-        // On pourrait ajouter ici des encodeurs spécifiques comme -c:a libmp3lame
     }
 
     args.extend(vec!["-y", output]);
 
-    Command::new(binaries::get_ffmpeg()).args(&args).spawn()
+    binaries::silent_cmd(binaries::get_ffmpeg()).args(&args).spawn()
 }
 
 /// Analyse le codec audio d'un fichier via ffprobe
 pub fn extraire_nom_codec(input: &PathBuf) -> String {
-    let out = Command::new(binaries::get_ffprobe())
+    let out = binaries::silent_cmd(binaries::get_ffprobe())
         .args(&[
             "-v",
             "error",

@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::process::Command;
 use std::sync::Arc;
 
 use lopdf::content::{Content, Operation};
@@ -64,7 +63,7 @@ impl FormatSortie {
 // ════════════════════════════════════════════════════════════════════════
 
 pub fn convertir(input: &Path, output: &str) -> bool {
-    Command::new(binaries::get_pandoc())
+    binaries::silent_cmd(binaries::get_pandoc())
         .arg(input.to_str().unwrap())
         .arg("-o").arg(output)
         .status()
@@ -72,7 +71,7 @@ pub fn convertir(input: &Path, output: &str) -> bool {
 }
 
 pub fn extraire_texte(input: &Path, output: &str) -> bool {
-    Command::new(binaries::get_pandoc())
+    binaries::silent_cmd(binaries::get_pandoc())
         .arg(input.to_str().unwrap())
         .arg("-t").arg("plain")
         .arg("-o").arg(output)
@@ -85,7 +84,7 @@ pub fn convertir_avec_formats(
     format_entree: Option<FormatEntree>,
     format_sortie: Option<FormatSortie>,
 ) -> bool {
-    let mut cmd = Command::new(binaries::get_pandoc());
+    let mut cmd = binaries::silent_cmd(binaries::get_pandoc());
     if let Some(fmt) = format_entree { cmd.arg("-f").arg(fmt.to_pandoc_arg()); }
     cmd.arg(input.to_str().unwrap());
     if let Some(fmt) = format_sortie { cmd.arg("-t").arg(fmt.to_pandoc_arg()); }
@@ -98,7 +97,7 @@ pub fn convertir_csv(input: &Path, output: &str, fmt: FormatSortie) -> bool {
 }
 
 pub fn traiter_log(input: &Path, output: &str) -> bool {
-    Command::new(binaries::get_pandoc())
+    binaries::silent_cmd(binaries::get_pandoc())
         .arg(input.to_str().unwrap())
         .arg("-f").arg("markdown").arg("-t").arg("plain")
         .arg("-o").arg(output)
