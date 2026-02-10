@@ -23,26 +23,26 @@ mod embedded {
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod embedded {
-    pub const FFMPEG:      &[u8] = include_bytes!("../../binlinuxx64/ffmpeg");
-    pub const FFPROBE:     &[u8] = include_bytes!("../../binlinuxx64/ffprobe");
-    pub const MKVPROPEDIT: &[u8] = include_bytes!("../../binlinuxx64/mkvpropedit");
-    pub const PANDOC:      &[u8] = include_bytes!("../../binlinuxx64/pandoc");
+    pub const FFMPEG:      &[u8] = include_bytes!("../../bin-linux-x64/ffmpeg");
+    pub const FFPROBE:     &[u8] = include_bytes!("../../bin-linux-x64/ffprobe");
+    pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-linux-x64/mkvpropedit");
+    pub const PANDOC:      &[u8] = include_bytes!("../../bin-linux-x64/pandoc");
 }
 
 #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
 mod embedded {
-    pub const FFMPEG:      &[u8] = include_bytes!("../../binlinuxarm/ffmpeg");
-    pub const FFPROBE:     &[u8] = include_bytes!("../../binlinuxarm/ffprobe");
-    pub const MKVPROPEDIT: &[u8] = include_bytes!("../../binlinuxarm/mkvpropedit");
-    pub const PANDOC:      &[u8] = include_bytes!("../../binlinuxarm/pandoc");
+    pub const FFMPEG:      &[u8] = include_bytes!("../../bin-linux-arm/ffmpeg");
+    pub const FFPROBE:     &[u8] = include_bytes!("../../bin-linux-arm/ffprobe");
+    pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-linux-arm/mkvpropedit");
+    pub const PANDOC:      &[u8] = include_bytes!("../../bin-linux-arm/pandoc");
 }
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 mod embedded {
-    pub const FFMPEG:      &[u8] = include_bytes!("../../binmacarm/ffmpeg");
-    pub const FFPROBE:     &[u8] = include_bytes!("../../binmacarm/ffprobe");
-    pub const MKVPROPEDIT: &[u8] = include_bytes!("../../binmacarm/mkvpropedit");
-    pub const PANDOC:      &[u8] = include_bytes!("../../binmacarm/pandoc");
+    pub const FFMPEG:      &[u8] = include_bytes!("../../bin-mac-arm/ffmpeg");
+    pub const FFPROBE:     &[u8] = include_bytes!("../../bin-mac-arm/ffprobe");
+    pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-mac-arm/mkvpropedit");
+    pub const PANDOC:      &[u8] = include_bytes!("../../bin-mac-arm/pandoc");
 }
 
 // ════════════════════════════════════════════════════════════════════════

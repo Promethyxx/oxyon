@@ -1,9 +1,9 @@
 # Rust
 /target
 /tests
-/bin linux ARM
-/bin linux X64
-/bin mac ARM
+/bin-linux-arm
+/bin-linux-x64
+/bin-mac-arm
 **/*.rs.bk
 .gitlab-ci.yml
 
