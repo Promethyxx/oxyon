@@ -77,47 +77,12 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    # Deploy to GitLab
-    - name: Deploy to GitLab Release
+    # Push to GitLab
+    - name: Push to GitLab
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
-        $headers = @{
-          "PRIVATE-TOKEN" = "${{ secrets.GITLAB_TOKEN }}"
-        }
-        
-        # Get or create release
-        try {
-          $release = Invoke-RestMethod -Uri "https://gitlab.com/api/v4/projects/Promethyxx%2Foxyon/releases/latest" -Headers $headers -Method Get
-          $releaseExists = $true
-        } catch {
-          $releaseExists = $false
-        }
-        
-        # Upload binaries
-        $files = @("oxyon-full.exe", "oxyon-office.exe")
-        foreach ($file in $files) {
-          $uploadResponse = Invoke-RestMethod -Uri "https://gitlab.com/api/v4/projects/Promethyxx%2Foxyon/uploads" -Headers $headers -Method Post -Form @{file = Get-Item $file}
-          Write-Host "Uploaded $file : $($uploadResponse.url)"
-        }
-        
-        # Create or update release
-        $body = @{
-          tag_name = "latest"
-          name = "Rolling Release"
-          description = @"
-        ### Available versions
-        - **oxyon-full.exe** : Complete version (Archives, Audio, Docs, Pictures, Scrap, Tag, Video)
-        - **oxyon-office.exe** : Office version (Docs, Pictures)
-
-        Tools required for compilation are available in the assets release.
-
-        *Last updated: ${{ github.event.head_commit.timestamp }}*
-        "@
-        } | ConvertTo-Json
-        
-        if ($releaseExists) {
-          Invoke-RestMethod -Uri "https://gitlab.com/api/v4/projects/Promethyxx%2Foxyon/releases/latest" -Headers $headers -Method Put -Body $body -ContentType "application/json"
-        } else {
-          Invoke-RestMethod -Uri "https://gitlab.com/api/v4/projects/Promethyxx%2Foxyon/releases" -Headers $headers -Method Post -Body $body -ContentType "application/json"
-        }
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+        git remote add gitlab https://oauth2:${{ secrets.GITLAB_TOKEN }}@gitlab.com/Promethyxx/oxyon.git
+        git push gitlab main --force
       shell: pwsh

@@ -5,6 +5,7 @@
 /bin linux X64
 /bin mac ARM
 **/*.rs.bk
+.gitlab-ci.yml
 
 # Archives
 *.zip
