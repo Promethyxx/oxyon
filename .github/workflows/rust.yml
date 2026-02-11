@@ -26,11 +26,6 @@ jobs:
             label: linux-arm64
             bin_dir: binlinuxarm
 
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            label: mac-arm64
-            bin_dir: binmacarm
-
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.label }}
 
@@ -49,9 +44,8 @@ jobs:
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ matrix.label }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ matrix.label }}-cargo-
+        key: cargo-${{ matrix.label }}-${{ hashFiles('**/*.rs') }}
+        restore-keys: cargo-${{ matrix.label }}-
 
     - name: Install Linux deps
       if: runner.os == 'Linux'
@@ -59,26 +53,19 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y gcc g++ cmake pkg-config libfontconfig1-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libssl-dev
 
-    - name: Download assets (Windows)
-      if: runner.os == 'Windows'
+    - name: Download assets
       run: |
-        New-Item -ItemType Directory -Force -Path bin
-        gh release download assets --pattern "*.exe" --dir bin --repo ${{ github.repository }}
-        Write-Host "Assets downloaded:"
-        Get-ChildItem bin/*.exe | ForEach-Object { Write-Host "  - $($_.Name) ($([math]::Round($_.Length/1MB, 1)) MB)" }
+        if [ ! -d "${{ matrix.bin_dir }}" ] || [ -z "$(ls -A ${{ matrix.bin_dir }})" ]; then
+          mkdir -p ${{ matrix.bin_dir }}
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            gh release download assets --pattern "*.exe" --dir ${{ matrix.bin_dir }} --repo ${{ github.repository }}
+          else
+            gh release download assets-${{ matrix.label }} --dir ${{ matrix.bin_dir }} --repo ${{ github.repository }} || echo "⚠️ No assets release for ${{ matrix.label }}"
+          fi
+        fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      shell: pwsh
-
-    - name: Download assets (Linux/Mac)
-      if: runner.os != 'Windows'
-      run: |
-        mkdir -p ${{ matrix.bin_dir }}
-        gh release download assets-${{ matrix.label }} --dir ${{ matrix.bin_dir }} --repo ${{ github.repository }} || echo "⚠️ No assets release for ${{ matrix.label }} yet"
-        chmod +x ${{ matrix.bin_dir }}/* 2>/dev/null || true
-        ls -lh ${{ matrix.bin_dir }}/
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
 
     - name: Build Full Version
       run: cargo build --profile dist --target ${{ matrix.target }}
@@ -88,8 +75,8 @@ jobs:
       run: Copy-Item target/${{ matrix.target }}/dist/oxyon.exe oxyon-${{ matrix.label }}.exe
       shell: pwsh
 
-    - name: Prepare Full Binary (Linux/Mac)
-      if: runner.os != 'Windows'
+    - name: Prepare Full Binary (Linux)
+      if: runner.os == 'Linux'
       run: |
         cp target/${{ matrix.target }}/dist/oxyon oxyon-${{ matrix.label }}
         chmod +x oxyon-${{ matrix.label }}
@@ -102,8 +89,8 @@ jobs:
       run: Copy-Item target/${{ matrix.target }}/dist/oxyon.exe oxyon-office-${{ matrix.label }}.exe
       shell: pwsh
 
-    - name: Prepare Office Binary (Linux/Mac)
-      if: runner.os != 'Windows'
+    - name: Prepare Office Binary (Linux)
+      if: runner.os == 'Linux'
       run: |
         cp target/${{ matrix.target }}/dist/oxyon oxyon-office-${{ matrix.label }}
         chmod +x oxyon-office-${{ matrix.label }}
@@ -138,9 +125,8 @@ jobs:
           | Platform | Full | Office |
           |----------|------|--------|
           | 🪟 Windows x64 | `oxyon-windows-x64.exe` | `oxyon-office-windows-x64.exe` |
-          | 🐧 Linux x64 | `oxyon-linux-x64` | `oxyon-office-linux-x64` |
-          | 🐧 Linux ARM64 | `oxyon-linux-arm64` | `oxyon-office-linux-arm64` |
-          | 🍎 macOS ARM64 | `oxyon-mac-arm64` | `oxyon-office-mac-arm64` |
+          | 🐧 Linux x64  | `oxyon-linux-x64`        | `oxyon-office-linux-x64` |
+          | 🐧 Linux ARM64| `oxyon-linux-arm64`      | `oxyon-office-linux-arm64` |
 
           *Last updated: ${{ github.event.head_commit.timestamp }}*
         files: oxyon-*
