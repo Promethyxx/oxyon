@@ -14,21 +14,41 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             label: windows-x64
+            asset_tag: assets-win-x64
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             label: linux-x64
+            asset_tag: assets-linux-x64
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             label: linux-arm64
+            asset_tag: assets-linux-arm
           - os: macos-latest
             target: aarch64-apple-darwin
             label: mac-arm64
+            asset_tag: assets-mac-arm
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.label }}
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Download Project Assets
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Création des dossiers attendus par ton code
+        mkdir -p bin-linux-arm bin-linux-x64 bin-win-x64 bin-mac-arm assets
+        
+        # Téléchargement depuis tes tags de release (vu sur ton screen)
+        gh release download ${{ matrix.asset_tag }} --pattern "*" --dir bin-${{ matrix.label }} || echo "No specific bin dir"
+        
+        # Téléchargement de l'icône (ajuste le tag si nécessaire)
+        gh release download assets-win-x64 --pattern "oxyon_icon.ico" --dir assets || echo "Icon not found"
+        
+        # Harmonisation pour le compilateur (il cherche bin-linux-arm/ffmpeg etc)
+        chmod +x bin-${{ matrix.label }}/* || true
 
     - name: Rust Cache
       uses: swatinem/rust-cache@v2
@@ -46,28 +66,19 @@ jobs:
 
     - name: Build Binaries
       run: |
-        # Build Standard (Oxyon)
         cargo build --profile dist --target ${{ matrix.target }}
         mv target/${{ matrix.target }}/dist/oxyon${{ runner.os == 'Windows' && '.exe' || '' }} oxyon-${{ matrix.label }}${{ runner.os == 'Windows' && '.exe' || '' }}
         
-        # Build Office
         cargo build --profile dist --no-default-features --target ${{ matrix.target }}
         mv target/${{ matrix.target }}/dist/oxyon${{ runner.os == 'Windows' && '.exe' || '' }} oxyon-office-${{ matrix.label }}${{ runner.os == 'Windows' && '.exe' || '' }}
 
     - name: Prepare Mac DMGs
       if: runner.os == 'macOS'
       run: |
-        # DMG pour Oxyon
         mkdir -p Oxyon.app/Contents/MacOS
         cp oxyon-${{ matrix.label }} Oxyon.app/Contents/MacOS/oxyon
         chmod +x Oxyon.app/Contents/MacOS/oxyon
         hdiutil create -volname "Oxyon" -srcfolder Oxyon.app -ov -format UDZO oxyon-${{ matrix.label }}.dmg
-
-        # DMG pour Oxyon Office
-        mkdir -p Oxyon-Office.app/Contents/MacOS
-        cp oxyon-office-${{ matrix.label }} Oxyon-Office.app/Contents/MacOS/oxyon
-        chmod +x Oxyon-Office.app/Contents/MacOS/oxyon
-        hdiutil create -volname "Oxyon Office" -srcfolder Oxyon-Office.app -ov -format UDZO oxyon-office-${{ matrix.label }}.dmg
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -89,10 +100,7 @@ jobs:
 
     - name: Final Rename and Hash
       run: |
-        # Hash pour Flatpak (Linux x64)
         if [ -f "oxyon-linux-x64" ]; then sha256sum oxyon-linux-x64 > hash-linux.txt; fi
-        
-        # Renommage propre pour la release
         [ -f "oxyon-windows-x64.exe" ] && mv oxyon-windows-x64.exe oxyon.exe
         [ -f "oxyon-office-windows-x64.exe" ] && mv oxyon-office-windows-x64.exe oxyon-office.exe
 
