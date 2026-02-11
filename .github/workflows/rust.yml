@@ -44,8 +44,9 @@ jobs:
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: cargo-${{ matrix.label }}-${{ hashFiles('**/*.rs') }}
-        restore-keys: cargo-${{ matrix.label }}-
+        key: ${{ matrix.label }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ matrix.label }}-cargo-
 
     - name: Install Linux deps
       if: runner.os == 'Linux'
@@ -53,35 +54,41 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y gcc g++ cmake pkg-config libfontconfig1-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libssl-dev
 
-    - name: Download assets
+    - name: Download assets (Windows)
+      if: runner.os == 'Windows'
       run: |
-        if [ ! -d "${{ matrix.bin_dir }}" ] || [ -z "$(ls -A ${{ matrix.bin_dir }})" ]; then
-          mkdir -p ${{ matrix.bin_dir }}
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            gh release download assets --pattern "*.exe" --dir ${{ matrix.bin_dir }} --repo ${{ github.repository }}
-          else
-            gh release download assets-${{ matrix.label }} --dir ${{ matrix.bin_dir }} --repo ${{ github.repository }} || echo "⚠️ No assets release for ${{ matrix.label }}"
-          fi
-        fi
+        New-Item -ItemType Directory -Force -Path bin
+        gh release download assets --pattern "*.exe" --dir bin --repo ${{ github.repository }}
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      shell: bash
+      shell: pwsh
 
-    - name: Build Full Version
+    - name: Download assets (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        mkdir -p ${{ matrix.bin_dir }}
+        gh release download assets-${{ matrix.label }} --dir ${{ matrix.bin_dir }} --repo ${{ github.repository }} || echo "⚠️ No assets release for ${{ matrix.label }} yet"
+        chmod +x ${{ matrix.bin_dir }}/* 2>/dev/null || true
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # Build full version
+    - name: Build
       run: cargo build --profile dist --target ${{ matrix.target }}
 
-    - name: Prepare Full Binary (Windows)
+    - name: Prepare Binary (Windows)
       if: runner.os == 'Windows'
       run: Copy-Item target/${{ matrix.target }}/dist/oxyon.exe oxyon-${{ matrix.label }}.exe
       shell: pwsh
 
-    - name: Prepare Full Binary (Linux)
+    - name: Prepare Binary (Linux)
       if: runner.os == 'Linux'
       run: |
         cp target/${{ matrix.target }}/dist/oxyon oxyon-${{ matrix.label }}
         chmod +x oxyon-${{ matrix.label }}
 
-    - name: Build Office Version
+    # Build office version
+    - name: Build Office
       run: cargo build --profile dist --no-default-features --target ${{ matrix.target }}
 
     - name: Prepare Office Binary (Windows)
@@ -104,7 +111,6 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
 
     steps:
     - name: Download all artifacts
@@ -125,10 +131,10 @@ jobs:
           | Platform | Full | Office |
           |----------|------|--------|
           | 🪟 Windows x64 | `oxyon-windows-x64.exe` | `oxyon-office-windows-x64.exe` |
-          | 🐧 Linux x64  | `oxyon-linux-x64`        | `oxyon-office-linux-x64` |
-          | 🐧 Linux ARM64| `oxyon-linux-arm64`      | `oxyon-office-linux-arm64` |
+          | 🐧 Linux x64 | `oxyon-linux-x64` | `oxyon-office-linux-x64` |
+          | 🐧 Linux ARM64 | `oxyon-linux-arm64` | `oxyon-office-linux-arm64` |
 
-          *Last updated: ${{ github.event.head_commit.timestamp }}*
+          *Built manually via workflow_dispatch*
         files: oxyon-*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
