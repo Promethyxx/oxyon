@@ -15,16 +15,19 @@ jobs:
             target: x86_64-pc-windows-msvc
             label: windows-x64
             bin_dir: bin
+            asset_tag: assets-win-x64
 
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             label: linux-x64
-            bin_dir: binlinuxx64
+            bin_dir: bin-linux-x64
+            asset_tag: assets-linux-x64
 
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             label: linux-arm64
-            bin_dir: binlinuxarm
+            bin_dir: bin-linux-arm
+            asset_tag: assets-linux-arm
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.label }}
@@ -58,7 +61,7 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         New-Item -ItemType Directory -Force -Path bin
-        gh release download assets-win-x64 --pattern "*.exe" --dir bin --repo ${{ github.repository }}
+        gh release download ${{ matrix.asset_tag }} --pattern "*.exe" --dir bin --repo ${{ github.repository }}
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: pwsh
@@ -67,12 +70,11 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         mkdir -p ${{ matrix.bin_dir }}
-        gh release download assets-${{ matrix.label }} --dir ${{ matrix.bin_dir }} --repo ${{ github.repository }} || echo "⚠️ No assets release for ${{ matrix.label }} yet"
-        chmod +x ${{ matrix.bin_dir }}/* 2>/dev/null || true
+        gh release download ${{ matrix.asset_tag }} --dir ${{ matrix.bin_dir }} --repo ${{ github.repository }}
+        chmod +x ${{ matrix.bin_dir }}/*
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    # Build full version
     - name: Build
       run: cargo build --profile dist --target ${{ matrix.target }}
 
@@ -87,7 +89,6 @@ jobs:
         cp target/${{ matrix.target }}/dist/oxyon oxyon-${{ matrix.label }}
         chmod +x oxyon-${{ matrix.label }}
 
-    # Build office version
     - name: Build Office
       run: cargo build --profile dist --no-default-features --target ${{ matrix.target }}
 
@@ -107,6 +108,12 @@ jobs:
       with:
         name: binaries-${{ matrix.label }}
         path: oxyon-*-${{ matrix.label }}*
+
+    - name: Upload artifacts (full)
+      uses: actions/upload-artifact@v4
+      with:
+        name: full-${{ matrix.label }}
+        path: oxyon-${{ matrix.label }}*
 
   release:
     needs: build
