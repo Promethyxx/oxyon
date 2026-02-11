@@ -58,7 +58,7 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         New-Item -ItemType Directory -Force -Path bin
-        gh release download assets --pattern "*.exe" --dir bin --repo ${{ github.repository }}
+        gh release download assets-win-x64 --pattern "*.exe" --dir bin --repo ${{ github.repository }}
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: pwsh
