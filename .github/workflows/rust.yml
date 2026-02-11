@@ -30,6 +30,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Rust Cache
+      uses: swatinem/rust-cache@v2
+
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
@@ -41,31 +44,38 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y gcc g++ cmake pkg-config libfontconfig1-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libssl-dev
 
-    - name: Build Binaries (Full & Office)
+    - name: Build Binaries
       run: |
+        # Build Standard (Oxyon)
         cargo build --profile dist --target ${{ matrix.target }}
-        mv target/${{ matrix.target }}/dist/oxyon${{ runner.os == 'Windows' && '.exe' || '' }} oxyon-full-${{ matrix.label }}${{ runner.os == 'Windows' && '.exe' || '' }}
+        mv target/${{ matrix.target }}/dist/oxyon${{ runner.os == 'Windows' && '.exe' || '' }} oxyon-${{ matrix.label }}${{ runner.os == 'Windows' && '.exe' || '' }}
         
+        # Build Office
         cargo build --profile dist --no-default-features --target ${{ matrix.target }}
         mv target/${{ matrix.target }}/dist/oxyon${{ runner.os == 'Windows' && '.exe' || '' }} oxyon-office-${{ matrix.label }}${{ runner.os == 'Windows' && '.exe' || '' }}
 
     - name: Prepare Mac DMGs
       if: runner.os == 'macOS'
       run: |
-        for type in full office; do
-          mkdir -p Oxyon-${type}.app/Contents/MacOS
-          cp oxyon-${type}-mac-arm64 Oxyon-${type}.app/Contents/MacOS/oxyon
-          chmod +x Oxyon-${type}.app/Contents/MacOS/oxyon
-          hdiutil create -volname "Oxyon ${type}" -srcfolder Oxyon-${type}.app -ov -format UDZO oxyon-${type}-mac-arm64.dmg
-        done
+        # DMG pour Oxyon
+        mkdir -p Oxyon.app/Contents/MacOS
+        cp oxyon-${{ matrix.label }} Oxyon.app/Contents/MacOS/oxyon
+        chmod +x Oxyon.app/Contents/MacOS/oxyon
+        hdiutil create -volname "Oxyon" -srcfolder Oxyon.app -ov -format UDZO oxyon-${{ matrix.label }}.dmg
+
+        # DMG pour Oxyon Office
+        mkdir -p Oxyon-Office.app/Contents/MacOS
+        cp oxyon-office-${{ matrix.label }} Oxyon-Office.app/Contents/MacOS/oxyon
+        chmod +x Oxyon-Office.app/Contents/MacOS/oxyon
+        hdiutil create -volname "Oxyon Office" -srcfolder Oxyon-Office.app -ov -format UDZO oxyon-office-${{ matrix.label }}.dmg
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: binaries-${{ matrix.label }}
+        retention-days: 1
         path: |
-          oxyon-full-*
-          oxyon-office-*
+          oxyon-*
           *.dmg
 
   release:
@@ -79,20 +89,12 @@ jobs:
 
     - name: Final Rename and Hash
       run: |
-        # Hash pour Flatpak (Linux x64 Full)
-        if [ -f "oxyon-full-linux-x64" ]; then sha256sum oxyon-full-linux-x64 > hash-linux.txt; fi
+        # Hash pour Flatpak (Linux x64)
+        if [ -f "oxyon-linux-x64" ]; then sha256sum oxyon-linux-x64 > hash-linux.txt; fi
         
-        # Renommage propre des versions Full
-        [ -f "oxyon-full-windows-x64.exe" ] && mv oxyon-full-windows-x64.exe oxyon.exe
-        [ -f "oxyon-full-linux-x64" ] && mv oxyon-full-linux-x64 oxyon-linux-x64
-        [ -f "oxyon-full-linux-arm64" ] && mv oxyon-full-linux-arm64 oxyon-linux-arm64
-        [ -f "oxyon-full-mac-arm64.dmg" ] && mv oxyon-full-mac-arm64.dmg oxyon-mac-arm64.dmg
-
-        # Renommage propre des versions Office
+        # Renommage propre pour la release
+        [ -f "oxyon-windows-x64.exe" ] && mv oxyon-windows-x64.exe oxyon.exe
         [ -f "oxyon-office-windows-x64.exe" ] && mv oxyon-office-windows-x64.exe oxyon-office.exe
-        [ -f "oxyon-office-linux-x64" ] && mv oxyon-office-linux-x64 oxyon-office-linux-x64
-        [ -f "oxyon-office-linux-arm64" ] && mv oxyon-office-linux-arm64 oxyon-office-linux-arm64
-        [ -f "oxyon-office-mac-arm64.dmg" ] && mv oxyon-office-mac-arm64.dmg oxyon-office-mac-arm64.dmg
 
     - name: Deploy to GitHub Release
       uses: softprops/action-gh-release@v2
