@@ -14,19 +14,22 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             label: windows-x64
-            asset_tag: assets-win-x64
+            bin_dir: bin
+
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             label: linux-x64
-            asset_tag: assets-linux-x64
+            bin_dir: binlinuxx64
+
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             label: linux-arm64
-            asset_tag: assets-linux-arm
+            bin_dir: binlinuxarm
+
           - os: macos-latest
             target: aarch64-apple-darwin
             label: mac-arm64
-            asset_tag: assets-mac-arm
+            bin_dir: binmacarm
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.label }}
@@ -34,29 +37,21 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Download Project Assets
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        # Création des dossiers attendus par ton code
-        mkdir -p bin-linux-arm bin-linux-x64 bin-win-x64 bin-mac-arm assets
-        
-        # Téléchargement depuis tes tags de release (vu sur ton screen)
-        gh release download ${{ matrix.asset_tag }} --pattern "*" --dir bin-${{ matrix.label }} || echo "No specific bin dir"
-        
-        # Téléchargement de l'icône (ajuste le tag si nécessaire)
-        gh release download assets-win-x64 --pattern "oxyon_icon.ico" --dir assets || echo "Icon not found"
-        
-        # Harmonisation pour le compilateur (il cherche bin-linux-arm/ffmpeg etc)
-        chmod +x bin-${{ matrix.label }}/* || true
-
-    - name: Rust Cache
-      uses: swatinem/rust-cache@v2
-
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
+
+    - name: Cache Cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ matrix.label }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ matrix.label }}-cargo-
 
     - name: Install Linux deps
       if: runner.os == 'Linux'
@@ -64,57 +59,90 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y gcc g++ cmake pkg-config libfontconfig1-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libssl-dev
 
-    - name: Build Binaries
+    - name: Download assets (Windows)
+      if: runner.os == 'Windows'
       run: |
-        cargo build --profile dist --target ${{ matrix.target }}
-        mv target/${{ matrix.target }}/dist/oxyon${{ runner.os == 'Windows' && '.exe' || '' }} oxyon-${{ matrix.label }}${{ runner.os == 'Windows' && '.exe' || '' }}
-        
-        cargo build --profile dist --no-default-features --target ${{ matrix.target }}
-        mv target/${{ matrix.target }}/dist/oxyon${{ runner.os == 'Windows' && '.exe' || '' }} oxyon-office-${{ matrix.label }}${{ runner.os == 'Windows' && '.exe' || '' }}
+        New-Item -ItemType Directory -Force -Path bin
+        gh release download assets --pattern "*.exe" --dir bin --repo ${{ github.repository }}
+        Write-Host "Assets downloaded:"
+        Get-ChildItem bin/*.exe | ForEach-Object { Write-Host "  - $($_.Name) ($([math]::Round($_.Length/1MB, 1)) MB)" }
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: pwsh
 
-    - name: Prepare Mac DMGs
-      if: runner.os == 'macOS'
+    - name: Download assets (Linux/Mac)
+      if: runner.os != 'Windows'
       run: |
-        mkdir -p Oxyon.app/Contents/MacOS
-        cp oxyon-${{ matrix.label }} Oxyon.app/Contents/MacOS/oxyon
-        chmod +x Oxyon.app/Contents/MacOS/oxyon
-        hdiutil create -volname "Oxyon" -srcfolder Oxyon.app -ov -format UDZO oxyon-${{ matrix.label }}.dmg
+        mkdir -p ${{ matrix.bin_dir }}
+        gh release download assets-${{ matrix.label }} --dir ${{ matrix.bin_dir }} --repo ${{ github.repository }} || echo "⚠️ No assets release for ${{ matrix.label }} yet"
+        chmod +x ${{ matrix.bin_dir }}/* 2>/dev/null || true
+        ls -lh ${{ matrix.bin_dir }}/
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build Full Version
+      run: cargo build --profile dist --target ${{ matrix.target }}
+
+    - name: Prepare Full Binary (Windows)
+      if: runner.os == 'Windows'
+      run: Copy-Item target/${{ matrix.target }}/dist/oxyon.exe oxyon-${{ matrix.label }}.exe
+      shell: pwsh
+
+    - name: Prepare Full Binary (Linux/Mac)
+      if: runner.os != 'Windows'
+      run: |
+        cp target/${{ matrix.target }}/dist/oxyon oxyon-${{ matrix.label }}
+        chmod +x oxyon-${{ matrix.label }}
+
+    - name: Build Office Version
+      run: cargo build --profile dist --no-default-features --target ${{ matrix.target }}
+
+    - name: Prepare Office Binary (Windows)
+      if: runner.os == 'Windows'
+      run: Copy-Item target/${{ matrix.target }}/dist/oxyon.exe oxyon-office-${{ matrix.label }}.exe
+      shell: pwsh
+
+    - name: Prepare Office Binary (Linux/Mac)
+      if: runner.os != 'Windows'
+      run: |
+        cp target/${{ matrix.target }}/dist/oxyon oxyon-office-${{ matrix.label }}
+        chmod +x oxyon-office-${{ matrix.label }}
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: binaries-${{ matrix.label }}
-        retention-days: 1
-        path: |
-          oxyon-*
-          *.dmg
+        path: oxyon-*-${{ matrix.label }}*
 
   release:
     needs: build
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+
     steps:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
         merge-multiple: true
 
-    - name: Final Rename and Hash
-      run: |
-        if [ -f "oxyon-linux-x64" ]; then sha256sum oxyon-linux-x64 > hash-linux.txt; fi
-        [ -f "oxyon-windows-x64.exe" ] && mv oxyon-windows-x64.exe oxyon.exe
-        [ -f "oxyon-office-windows-x64.exe" ] && mv oxyon-office-windows-x64.exe oxyon-office.exe
+    - name: List files
+      run: ls -lh oxyon-*
 
     - name: Deploy to GitHub Release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: latest
-        files: |
-          oxyon.exe
-          oxyon-linux-*
-          oxyon-mac-arm64.dmg
-          oxyon-office.exe
-          oxyon-office-linux-*
-          oxyon-office-mac-arm64.dmg
-          hash-linux.txt
+        body: |
+          ### Available versions
+
+          | Platform | Full | Office |
+          |----------|------|--------|
+          | 🪟 Windows x64 | `oxyon-windows-x64.exe` | `oxyon-office-windows-x64.exe` |
+          | 🐧 Linux x64 | `oxyon-linux-x64` | `oxyon-office-linux-x64` |
+          | 🐧 Linux ARM64 | `oxyon-linux-arm64` | `oxyon-office-linux-arm64` |
+          | 🍎 macOS ARM64 | `oxyon-mac-arm64` | `oxyon-office-mac-arm64` |
+
+          *Last updated: ${{ github.event.head_commit.timestamp }}*
+        files: oxyon-*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
