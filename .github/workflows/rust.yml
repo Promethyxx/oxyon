@@ -14,19 +14,15 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             label: windows-x64
-            bin_dir: bin
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             label: linux-x64
-            bin_dir: binlinuxx64
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             label: linux-arm64
-            bin_dir: binlinuxarm
           - os: macos-latest
             target: aarch64-apple-darwin
             label: mac-arm64
-            bin_dir: binmacarm
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.label }}
@@ -39,40 +35,29 @@ jobs:
       with:
         targets: ${{ matrix.target }}
 
-    - name: Cache Cargo
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ matrix.label }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ matrix.label }}-cargo-
-
     - name: Install Linux deps
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
         sudo apt-get install -y gcc g++ cmake pkg-config libfontconfig1-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libssl-dev
 
-    - name: Build Full Version
-      run: cargo build --profile dist --target ${{ matrix.target }}
-
-    - name: Prepare Binaries
-      shell: bash
+    - name: Build Binaries (Full & Office)
       run: |
-        if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          cp target/${{ matrix.target }}/dist/oxyon.exe oxyon-full-${{ matrix.label }}.exe
-        elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-          mkdir -p Oxyon-Full.app/Contents/MacOS
-          cp target/${{ matrix.target }}/dist/oxyon Oxyon-Full.app/Contents/MacOS/
-          chmod +x Oxyon-Full.app/Contents/MacOS/oxyon
-          hdiutil create -volname "Oxyon Full" -srcfolder Oxyon-Full.app -ov -format UDZO oxyon-full-mac-arm64.dmg
-        else
-          cp target/${{ matrix.target }}/dist/oxyon oxyon-full-${{ matrix.label }}
-          chmod +x oxyon-full-${{ matrix.label }}
-        fi
+        cargo build --profile dist --target ${{ matrix.target }}
+        mv target/${{ matrix.target }}/dist/oxyon${{ runner.os == 'Windows' && '.exe' || '' }} oxyon-full-${{ matrix.label }}${{ runner.os == 'Windows' && '.exe' || '' }}
+        
+        cargo build --profile dist --no-default-features --target ${{ matrix.target }}
+        mv target/${{ matrix.target }}/dist/oxyon${{ runner.os == 'Windows' && '.exe' || '' }} oxyon-office-${{ matrix.label }}${{ runner.os == 'Windows' && '.exe' || '' }}
+
+    - name: Prepare Mac DMGs
+      if: runner.os == 'macOS'
+      run: |
+        for type in full office; do
+          mkdir -p Oxyon-${type}.app/Contents/MacOS
+          cp oxyon-${type}-mac-arm64 Oxyon-${type}.app/Contents/MacOS/oxyon
+          chmod +x Oxyon-${type}.app/Contents/MacOS/oxyon
+          hdiutil create -volname "Oxyon ${type}" -srcfolder Oxyon-${type}.app -ov -format UDZO oxyon-${type}-mac-arm64.dmg
+        done
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -80,6 +65,7 @@ jobs:
         name: binaries-${{ matrix.label }}
         path: |
           oxyon-full-*
+          oxyon-office-*
           *.dmg
 
   release:
@@ -93,20 +79,20 @@ jobs:
 
     - name: Final Rename and Hash
       run: |
-        # Renommage Windows
-        [ -f "oxyon-full-windows-x64.exe" ] && mv oxyon-full-windows-x64.exe oxyon.exe
+        # Hash pour Flatpak (Linux x64 Full)
+        if [ -f "oxyon-full-linux-x64" ]; then sha256sum oxyon-full-linux-x64 > hash-linux.txt; fi
         
-        # Renommage Linux et Hash pour Flatpak
-        if [ -f "oxyon-full-linux-x64" ]; then
-          sha256sum oxyon-full-linux-x64 > hash-linux.txt
-          mv oxyon-full-linux-x64 oxyon-linux-x64
-        fi
-
-        # Renommage Linux ARM
+        # Renommage propre des versions Full
+        [ -f "oxyon-full-windows-x64.exe" ] && mv oxyon-full-windows-x64.exe oxyon.exe
+        [ -f "oxyon-full-linux-x64" ] && mv oxyon-full-linux-x64 oxyon-linux-x64
         [ -f "oxyon-full-linux-arm64" ] && mv oxyon-full-linux-arm64 oxyon-linux-arm64
-
-        # Renommage Mac
         [ -f "oxyon-full-mac-arm64.dmg" ] && mv oxyon-full-mac-arm64.dmg oxyon-mac-arm64.dmg
+
+        # Renommage propre des versions Office
+        [ -f "oxyon-office-windows-x64.exe" ] && mv oxyon-office-windows-x64.exe oxyon-office.exe
+        [ -f "oxyon-office-linux-x64" ] && mv oxyon-office-linux-x64 oxyon-office-linux-x64
+        [ -f "oxyon-office-linux-arm64" ] && mv oxyon-office-linux-arm64 oxyon-office-linux-arm64
+        [ -f "oxyon-office-mac-arm64.dmg" ] && mv oxyon-office-mac-arm64.dmg oxyon-office-mac-arm64.dmg
 
     - name: Deploy to GitHub Release
       uses: softprops/action-gh-release@v2
@@ -114,9 +100,11 @@ jobs:
         tag_name: latest
         files: |
           oxyon.exe
-          oxyon-linux-x64
-          oxyon-linux-arm64
+          oxyon-linux-*
           oxyon-mac-arm64.dmg
+          oxyon-office.exe
+          oxyon-office-linux-*
+          oxyon-office-mac-arm64.dmg
           hash-linux.txt
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
