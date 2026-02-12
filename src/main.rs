@@ -1070,7 +1070,25 @@ impl eframe::App for OxyonApp {
                 }
             }
 
-            if self.current_files.is_empty() { ui.centered_and_justified(|ui| { ui.label("📥 Glissez vos fichiers ici"); }); }
+            if self.current_files.is_empty() {
+                ui.centered_and_justified(|ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.label("📥 Glissez vos fichiers ici");
+                        ui.add_space(5.0);
+                        if ui.button("📂 Parcourir").clicked() {
+                            if let Some(paths) = rfd::FileDialog::new().pick_files() {
+                                self.current_files = paths;
+                                if let Some(p) = self.current_files.first() {
+                                    self.current_stem = p.file_stem().unwrap_or_default().to_string_lossy().to_string();
+                                }
+                                #[cfg(feature = "api")]
+                                self.results_ui.lock().unwrap().clear();
+                                *self.status.lock().unwrap() = format!("📁 {} fichiers chargés", self.current_files.len());
+                            }
+                        }
+                    });
+                });
+            }
             ui.add_space(10.0);
             ui.vertical_centered(|ui| { 
                 let completed = *self.completed_jobs.lock().unwrap();
@@ -1108,7 +1126,10 @@ fn parse_pages_spec(spec: &str) -> Option<Vec<u32>> {
 fn main() -> eframe::Result {
     let _ = modules::binaries::extraire_deps();
     let mut options = eframe::NativeOptions::default();
-    let icon_bytes = include_bytes!("../assets/oxyon_icon.ico");
+    #[cfg(target_os = "windows")]
+let icon_bytes: &[u8] = include_bytes!("../assets/oxyon_icon.ico");
+#[cfg(not(target_os = "windows"))]
+let icon_bytes: &[u8] = include_bytes!("../assets/oxyon_icon.png");
     if let Ok(icon_data) = image::load_from_memory(icon_bytes) {
         let icon_rgba = icon_data.to_rgba8();
         let (width, height) = icon_rgba.dimensions();

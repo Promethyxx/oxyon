@@ -107,19 +107,22 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: binaries-${{ matrix.label }}
-        path: oxyon-*-${{ matrix.label }}*
-
-    - name: Upload artifacts (full)
-      uses: actions/upload-artifact@v4
-      with:
-        name: full-${{ matrix.label }}
-        path: oxyon-${{ matrix.label }}*
+        path: oxyon-*
 
   release:
     needs: build
     runs-on: ubuntu-latest
 
     steps:
+    - uses: actions/checkout@v4
+
+    - name: Get version
+      id: version
+      run: |
+        VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "Version: $VERSION"
+
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
@@ -128,20 +131,29 @@ jobs:
     - name: List files
       run: ls -lh oxyon-*
 
+    - name: Generate SHA256
+      run: |
+        sha256sum oxyon-* > SHA256SUMS.txt
+        cat SHA256SUMS.txt
+
     - name: Deploy to GitHub Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: latest
+        tag_name: v${{ steps.version.outputs.version }}
+        name: Oxyon v${{ steps.version.outputs.version }}
         body: |
-          ### Available versions
+          ### Oxyon v${{ steps.version.outputs.version }}
 
           | Platform | Full | Office |
           |----------|------|--------|
-          | 🪟 Windows x64 | `oxyon-windows-x64.exe` | `oxyon-office-windows-x64.exe` |
-          | 🐧 Linux x64 | `oxyon-linux-x64` | `oxyon-office-linux-x64` |
-          | 🐧 Linux ARM64 | `oxyon-linux-arm64` | `oxyon-office-linux-arm64` |
+          | Windows x64 | `oxyon-windows-x64.exe` | `oxyon-office-windows-x64.exe` |
+          | Linux x64 | `oxyon-linux-x64` | `oxyon-office-linux-x64` |
+          | Linux ARM64 | `oxyon-linux-arm64` | `oxyon-office-linux-arm64` |
 
-          *Built manually via workflow_dispatch*
-        files: oxyon-*
+          ### SHA256 Checksums
+          See `SHA256SUMS.txt` asset for all hashes.
+        files: |
+          oxyon-*
+          SHA256SUMS.txt
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
