@@ -1127,9 +1127,9 @@ fn main() -> eframe::Result {
     let _ = modules::binaries::extraire_deps();
     let mut options = eframe::NativeOptions::default();
     #[cfg(target_os = "windows")]
-let icon_bytes: &[u8] = include_bytes!("../assets/oxyon_icon.ico");
-#[cfg(not(target_os = "windows"))]
-let icon_bytes: &[u8] = include_bytes!("../assets/oxyon_icon.png");
+    let icon_bytes: &[u8] = include_bytes!("../assets/oxyon_icon.ico");
+    #[cfg(not(target_os = "windows"))]
+    let icon_bytes: &[u8] = include_bytes!("../assets/oxyon_icon.png");
     if let Ok(icon_data) = image::load_from_memory(icon_bytes) {
         let icon_rgba = icon_data.to_rgba8();
         let (width, height) = icon_rgba.dimensions();
