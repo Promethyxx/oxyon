@@ -21,7 +21,7 @@ This is my first software project, built with AI assistance. Contributions and f
 ## 🚀 Quick Start
 1. Download the latest release from [Releases](../../releases)
 2. Run the executable
-3. Drag & drop your files
+3. Drag & drop your files or locate it
 4. Select output format
 5. Click "Execute"
 
