@@ -4,8 +4,6 @@
 /bin-linux-arm
 /bin-linux-x64
 /bin-mac-arm
-/oxyon_flathub
-/oxyon_winget
 **/*.rs.bk
 .gitlab-ci.yml
 
