@@ -1,18 +1,19 @@
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::OnceLock;
-
-static TOOLS_DIR: OnceLock<PathBuf> = OnceLock::new();
-
+static TOOLS_DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
 #[cfg(target_os = "windows")]
 const EXT: &str = ".exe";
 #[cfg(not(target_os = "windows"))]
 const EXT: &str = "";
 
+fn is_flatpak() -> bool {
+    std::env::var("FLATPAK_ID").is_ok()
+}
+
 // ════════════════════════════════════════════════════════════════════════
 //  BINAIRES EMBARQUÉS PAR PLATEFORME
 // ════════════════════════════════════════════════════════════════════════
-
 #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin/ffmpeg.exe");
@@ -20,7 +21,6 @@ mod embedded {
     pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin/mkvpropedit.exe");
     pub const PANDOC:      &[u8] = include_bytes!("../../bin/pandoc.exe");
 }
-
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin-linux-x64/ffmpeg");
@@ -28,7 +28,6 @@ mod embedded {
     pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-linux-x64/mkvpropedit");
     pub const PANDOC:      &[u8] = include_bytes!("../../bin-linux-x64/pandoc");
 }
-
 #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin-linux-arm/ffmpeg");
@@ -36,7 +35,6 @@ mod embedded {
     pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-linux-arm/mkvpropedit");
     pub const PANDOC:      &[u8] = include_bytes!("../../bin-linux-arm/pandoc");
 }
-
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin-mac-arm/ffmpeg");
@@ -48,13 +46,15 @@ mod embedded {
 // ════════════════════════════════════════════════════════════════════════
 //  EXTRACTION
 // ════════════════════════════════════════════════════════════════════════
-
 pub fn extraire_deps() -> Result<(), String> {
+    if is_flatpak() {
+        TOOLS_DIR.set(None).ok();
+        return Ok(());
+    }
     let temp_dir = std::env::temp_dir().join("oxyon_tools");
     if !temp_dir.exists() {
         std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
     }
-
     let f = |name: &str, bytes: &[u8]| -> Result<(), String> {
         let path = temp_dir.join(name);
         if !path.exists() {
@@ -63,26 +63,22 @@ pub fn extraire_deps() -> Result<(), String> {
             {
                 use std::os::unix::fs::PermissionsExt;
                 std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
-                    .map_err(|e| e.to_string())?;
+                .map_err(|e| e.to_string())?;
             }
         }
         Ok(())
     };
-
     f(&format!("ffmpeg{}", EXT),      embedded::FFMPEG)?;
     f(&format!("ffprobe{}", EXT),     embedded::FFPROBE)?;
     f(&format!("mkvpropedit{}", EXT), embedded::MKVPROPEDIT)?;
     f(&format!("pandoc{}", EXT),      embedded::PANDOC)?;
-
-    TOOLS_DIR.set(temp_dir).ok();
+    TOOLS_DIR.set(Some(temp_dir)).ok();
     Ok(())
 }
 
 // ════════════════════════════════════════════════════════════════════════
 //  HELPERS
 // ════════════════════════════════════════════════════════════════════════
-
-/// Crée une Command silencieuse (pas de fenêtre CMD sur Windows)
 pub fn silent_cmd(program: PathBuf) -> Command {
     let cmd = Command::new(program);
     #[cfg(target_os = "windows")]
@@ -94,24 +90,20 @@ pub fn silent_cmd(program: PathBuf) -> Command {
     cmd
 }
 
-pub fn get_ffmpeg() -> PathBuf {
-    TOOLS_DIR.get().expect("extraire_deps doit être appelé d'abord").join(format!("ffmpeg{}", EXT))
+fn get_tool(name: &str) -> PathBuf {
+    match TOOLS_DIR.get().expect("extraire_deps doit être appelé d'abord") {
+        Some(dir) => dir.join(format!("{}{}", name, EXT)),
+        None => PathBuf::from(format!("/app/bin/{}", name)),
+    }
 }
 
-pub fn get_ffprobe() -> PathBuf {
-    TOOLS_DIR.get().expect("extraire_deps doit être appelé d'abord").join(format!("ffprobe{}", EXT))
-}
-
-pub fn get_pandoc() -> PathBuf {
-    TOOLS_DIR.get().expect("extraire_deps doit être appelé d'abord").join(format!("pandoc{}", EXT))
-}
-
-pub fn get_mkvpropedit() -> PathBuf {
-    TOOLS_DIR.get().expect("extraire_deps doit être appelé d'abord").join(format!("mkvpropedit{}", EXT))
-}
+pub fn get_ffmpeg() -> PathBuf { get_tool("ffmpeg") }
+pub fn get_ffprobe() -> PathBuf { get_tool("ffprobe") }
+pub fn get_pandoc() -> PathBuf { get_tool("pandoc") }
+pub fn get_mkvpropedit() -> PathBuf { get_tool("mkvpropedit") }
 
 pub fn cleanup() {
-    if let Some(dir) = TOOLS_DIR.get() {
+    if let Some(Some(dir)) = TOOLS_DIR.get() {
         let _ = std::fs::remove_dir_all(dir);
     }
 }

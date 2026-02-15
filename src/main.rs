@@ -6,26 +6,23 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::fs::OpenOptions;
 use std::io::Write;
-
 fn log_error(message: &str) {
     let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
     let log_line = format!("[{}] ERROR: {}\n", timestamp, message);
     if let Ok(mut file) = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("oxyon_errors.log") 
-    {
-        let _ = file.write_all(log_line.as_bytes());
-    }
+        .open("oxyon_errors.log")
+        {
+            let _ = file.write_all(log_line.as_bytes());
+        }
 }
-
 #[cfg(feature = "api")]
 #[derive(Clone)]
 struct ScrapeEntry {
     data: modules::scrap::ScrapeResult,
     texture: Option<egui::TextureHandle>,
 }
-
 #[derive(PartialEq, Clone, Copy, Debug)]
 enum ModuleType {
     #[cfg(feature = "api")]
@@ -42,70 +39,68 @@ enum ModuleType {
     Video,
     Settings,
 }
-
 struct OxyonApp {
     #[cfg(feature = "api")]
     copie_flux: bool,
     current_files: Vec<PathBuf>,
     current_stem: String,
     format_choisi: String,
-    module_actif: ModuleType,
-    process: Option<std::process::Child>,
-    ratio_img: u32,
-    #[cfg(feature = "api")]
-    results_ui: Arc<Mutex<Vec<ScrapeEntry>>>,
-    status: Arc<Mutex<String>>,
-    #[cfg(feature = "api")]
-    taille_vol: String,
-    deps_manquantes: Vec<String>,
-    #[cfg(feature = "api")]
-    tag_edit_val: String,
-    current_theme: String,
-    tmdb_api_key: String,
-    fanart_api_key: String,
-    save_doc_format: bool,
-    save_image_format: bool,
-    #[cfg(feature = "api")]
-    save_archive_format: bool,
-    #[cfg(feature = "api")]
-    save_audio_format: bool,
-    #[cfg(feature = "api")]
-    save_video_format: bool,
-    image_action: String,
-    rotation_angle: u32,
-    crop_x: u32,
-    crop_y: u32,
-    crop_width: u32,
-    crop_height: u32,
-    resize_width: String,
-    resize_height: String,
-    resize_max_kb: String,
-    doc_action: String,
-    pdf_rotation_angle: u16,
-    pdf_pages_spec: String,
-    pdf_crop_x: f64,
-    pdf_crop_y: f64,
-    pdf_crop_w: f64,
-    pdf_crop_h: f64,
-    pdf_num_debut: u32,
-    pdf_num_position: String,
-    pdf_num_taille: f64,
-    pdf_owner_pass: String,
-    pdf_user_pass: String,
-    pdf_allow_print: bool,
-    pdf_allow_copy: bool,
-    pdf_unlock_pass: String,
-    pdf_wm_texte: String,
-    pdf_wm_taille: f64,
-    pdf_wm_opacite: f64,
-    pdf_nouvel_ordre: String,
-    max_parallel_jobs: usize,
-    active_jobs: Arc<Mutex<usize>>,
-    completed_jobs: Arc<Mutex<usize>>,
-    total_jobs: Arc<Mutex<usize>>,
-    job_queue: Arc<Mutex<Vec<PathBuf>>>,
+        module_actif: ModuleType,
+        process: Option<std::process::Child>,
+        ratio_img: u32,
+        #[cfg(feature = "api")]
+        results_ui: Arc<Mutex<Vec<ScrapeEntry>>>,
+        status: Arc<Mutex<String>>,
+        #[cfg(feature = "api")]
+        taille_vol: String,
+        deps_manquantes: Vec<String>,
+        #[cfg(feature = "api")]
+        tag_edit_val: String,
+        current_theme: String,
+        tmdb_api_key: String,
+        fanart_api_key: String,
+        save_doc_format: bool,
+        save_image_format: bool,
+        #[cfg(feature = "api")]
+        save_archive_format: bool,
+        #[cfg(feature = "api")]
+        save_audio_format: bool,
+        #[cfg(feature = "api")]
+        save_video_format: bool,
+        image_action: String,
+        rotation_angle: u32,
+        crop_x: u32,
+        crop_y: u32,
+        crop_width: u32,
+        crop_height: u32,
+        resize_width: String,
+        resize_height: String,
+        resize_max_kb: String,
+        doc_action: String,
+        pdf_rotation_angle: u16,
+        pdf_pages_spec: String,
+        pdf_crop_x: f64,
+        pdf_crop_y: f64,
+        pdf_crop_w: f64,
+        pdf_crop_h: f64,
+        pdf_num_debut: u32,
+        pdf_num_position: String,
+        pdf_num_taille: f64,
+        pdf_owner_pass: String,
+        pdf_user_pass: String,
+        pdf_allow_print: bool,
+        pdf_allow_copy: bool,
+        pdf_unlock_pass: String,
+        pdf_wm_texte: String,
+        pdf_wm_taille: f64,
+        pdf_wm_opacite: f64,
+        pdf_nouvel_ordre: String,
+        max_parallel_jobs: usize,
+        active_jobs: Arc<Mutex<usize>>,
+        completed_jobs: Arc<Mutex<usize>>,
+        total_jobs: Arc<Mutex<usize>>,
+        job_queue: Arc<Mutex<Vec<PathBuf>>>,
 }
-
 impl Default for OxyonApp {
     fn default() -> Self {
         Self {
@@ -114,65 +109,64 @@ impl Default for OxyonApp {
             current_files: Vec::new(),
             current_stem: String::new(),
             format_choisi: "mp4".into(),
-            module_actif: ModuleType::Image,
-            process: None,
-            ratio_img: 2,
-            #[cfg(feature = "api")]
-            results_ui: Arc::new(Mutex::new(Vec::new())),
-            status: Arc::new(Mutex::new("Déposez des fichiers".into())),
-            #[cfg(feature = "api")]
-            taille_vol: "".into(),
-            deps_manquantes: Vec::new(),
-            #[cfg(feature = "api")]
-            tag_edit_val: String::new(),
-            current_theme: "Dark".into(),
-            tmdb_api_key: String::new(),
-            fanart_api_key: String::new(),
-            save_doc_format: false,
-            save_image_format: false,
-            #[cfg(feature = "api")]
-            save_archive_format: false,
-            #[cfg(feature = "api")]
-            save_audio_format: false,
-            #[cfg(feature = "api")]
-            save_video_format: false,
-            image_action: "convert".into(),
-            rotation_angle: 90,
-            crop_x: 0,
-            crop_y: 0,
-            crop_width: 100,
-            crop_height: 100,
-            resize_width: String::new(),
-            resize_height: String::new(),
-            resize_max_kb: String::new(),
-            doc_action: "convert".into(),
-            pdf_rotation_angle: 90,
-            pdf_pages_spec: "1-end".into(),
-            pdf_crop_x: 0.0,
-            pdf_crop_y: 0.0,
-            pdf_crop_w: 100.0,
-            pdf_crop_h: 100.0,
-            pdf_num_debut: 1,
-            pdf_num_position: "BasCentre".into(),
-            pdf_num_taille: 10.0,
-            pdf_owner_pass: String::new(),
-            pdf_user_pass: String::new(),
-            pdf_allow_print: true,
-            pdf_allow_copy: true,
-            pdf_unlock_pass: String::new(),
-            pdf_wm_texte: "CONFIDENTIEL".into(),
-            pdf_wm_taille: 60.0,
-            pdf_wm_opacite: 0.15,
-            pdf_nouvel_ordre: String::new(),
-            max_parallel_jobs: 4,
-            active_jobs: Arc::new(Mutex::new(0)),
-            completed_jobs: Arc::new(Mutex::new(0)),
-            total_jobs: Arc::new(Mutex::new(0)),
-            job_queue: Arc::new(Mutex::new(Vec::new())),
+                module_actif: ModuleType::Image,
+                process: None,
+                ratio_img: 2,
+                #[cfg(feature = "api")]
+                results_ui: Arc::new(Mutex::new(Vec::new())),
+                status: Arc::new(Mutex::new("Déposez des fichiers".into())),
+                #[cfg(feature = "api")]
+                taille_vol: "".into(),
+                deps_manquantes: Vec::new(),
+                #[cfg(feature = "api")]
+                tag_edit_val: String::new(),
+                current_theme: "Dark".into(),
+                tmdb_api_key: String::new(),
+                fanart_api_key: String::new(),
+                save_doc_format: false,
+                save_image_format: false,
+                #[cfg(feature = "api")]
+                save_archive_format: false,
+                #[cfg(feature = "api")]
+                save_audio_format: false,
+                #[cfg(feature = "api")]
+                save_video_format: false,
+                image_action: "convert".into(),
+                rotation_angle: 90,
+                crop_x: 0,
+                crop_y: 0,
+                crop_width: 100,
+                crop_height: 100,
+                resize_width: String::new(),
+                resize_height: String::new(),
+                resize_max_kb: String::new(),
+                doc_action: "convert".into(),
+                pdf_rotation_angle: 90,
+                pdf_pages_spec: "1-end".into(),
+                pdf_crop_x: 0.0,
+                pdf_crop_y: 0.0,
+                pdf_crop_w: 100.0,
+                pdf_crop_h: 100.0,
+                pdf_num_debut: 1,
+                pdf_num_position: "BasCentre".into(),
+                pdf_num_taille: 10.0,
+                pdf_owner_pass: String::new(),
+                pdf_user_pass: String::new(),
+                pdf_allow_print: true,
+                pdf_allow_copy: true,
+                pdf_unlock_pass: String::new(),
+                pdf_wm_texte: "CONFIDENTIEL".into(),
+                pdf_wm_taille: 60.0,
+                pdf_wm_opacite: 0.15,
+                pdf_nouvel_ordre: String::new(),
+                max_parallel_jobs: 4,
+                active_jobs: Arc::new(Mutex::new(0)),
+                completed_jobs: Arc::new(Mutex::new(0)),
+                total_jobs: Arc::new(Mutex::new(0)),
+                job_queue: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }
-
 impl OxyonApp {
     fn load_config(&mut self) {
         match self.module_actif {
@@ -244,7 +238,6 @@ impl OxyonApp {
         if let Ok(k) = std::env::var("TMDB_API_KEY") { self.tmdb_api_key = k; }
         if let Ok(k) = std::env::var("FANART_API_KEY") { self.fanart_api_key = k; }
     }
-
     fn save_config(&self) {
         let mut parsed = if let Ok(c) = std::fs::read_to_string("config.toml") {
             c.parse::<toml::Table>().unwrap_or_else(|_| toml::Table::new())
@@ -328,7 +321,6 @@ impl OxyonApp {
         }
         let _ = std::fs::write("config.toml", toml::to_string(&parsed).unwrap_or_default());
     }
-
     fn apply_theme(&self, ctx: &egui::Context) {
         match self.current_theme.as_str() {
             "Light" => ctx.set_visuals(egui::Visuals::light()),
@@ -336,11 +328,9 @@ impl OxyonApp {
             _ => ctx.set_visuals(egui::Visuals::default()),
         }
     }
-
     fn verifier_deps(&mut self) {
         self.deps_manquantes = Vec::new();
     }
-
     fn lancer_batch(&mut self, ctx: egui::Context) {
         *self.completed_jobs.lock().unwrap() = 0;
         *self.total_jobs.lock().unwrap() = self.current_files.len();
@@ -354,7 +344,6 @@ impl OxyonApp {
             self.spawn_worker(ctx.clone());
         }
     }
-
     fn spawn_worker(&mut self, ctx: egui::Context) {
         let queue = Arc::clone(&self.job_queue);
         let active = Arc::clone(&self.active_jobs);
@@ -395,7 +384,6 @@ impl OxyonApp {
         let pdf_wm_taille = self.pdf_wm_taille;
         let pdf_wm_opacite = self.pdf_wm_opacite;
         let pdf_nouvel_ordre = self.pdf_nouvel_ordre.clone();
-
         std::thread::spawn(move || {
             loop {
                 let job = {
@@ -404,7 +392,7 @@ impl OxyonApp {
                 };
                 let input = match job {
                     Some(path) => path,
-                    None => break,
+                           None => break,
                 };
                 *active.lock().unwrap() += 1;
                 let effective_fmt = if module == ModuleType::Doc && doc_action != "convert" {
@@ -415,7 +403,7 @@ impl OxyonApp {
                 let output = input.parent().unwrap().join(format!(
                     "{}_oxyon.{}",
                     input.file_stem().unwrap_or_default().to_string_lossy(),
-                    effective_fmt
+                                                                  effective_fmt
                 ));
                 let out_str = output.to_str().unwrap().to_string();
                 let current = *completed.lock().unwrap() + *active.lock().unwrap();
@@ -425,111 +413,111 @@ impl OxyonApp {
                 let success = match module {
                     #[cfg(feature = "api")]
                     ModuleType::Archive => modules::archive::compresser(&input, &out_str, &fmt),
-                    #[cfg(feature = "api")]
-                    ModuleType::Audio => {
-                        match modules::audio::convertir(&input, &out_str, "192k") {
-                            Ok(mut child) => child.wait().is_ok(),
-                            Err(_) => false
-                        }
-                    },
-                    #[cfg(feature = "api")]
-                    ModuleType::Video => {
-                        match modules::video::traiter_video(&input, &out_str, copie, false) {
-                            Ok(mut child) => child.wait().is_ok(),
-                            Err(_) => false
-                        }
-                    },
-                    ModuleType::Doc => {
-                        match doc_action.as_str() {
-                            "convert" => {
-                                let format_entree = modules::doc::detecter_format_entree(&input);
-                                let format_sortie = modules::doc::detecter_format_sortie(&out_str);
-                                modules::doc::convertir_avec_formats(&input, &out_str, format_entree, format_sortie)
-                            },
-                            "pdf_split" => {
-                                let output_dir = input.parent().unwrap().join(format!(
-                                    "{}_pages",
-                                    input.file_stem().unwrap_or_default().to_string_lossy()
-                                ));
-                                std::fs::create_dir_all(&output_dir).ok();
-                                modules::doc::pdf_split(&input, output_dir.to_str().unwrap()).is_ok()
-                            },
-                            "pdf_merge" => {
-                                let paths: Vec<&Path> = pdf_merge_list.iter().map(|p| p.as_path()).collect();
-                                let output_merge = input.parent().unwrap().join("merged_oxyon.pdf");
-                                modules::doc::pdf_merge(&paths, output_merge.to_str().unwrap()).is_ok()
-                            },
-                            "pdf_rotate" => {
-                                let pages_opt = parse_pages_spec(&pdf_pages);
-                                modules::doc::pdf_rotate(&input, &out_str, pdf_angle, pages_opt.as_deref()).is_ok()
-                            },
-                            "pdf_compress" => modules::doc::pdf_compresser(&input, &out_str).is_ok(),
-                            "pdf_crop" => {
-                                let pages_opt = parse_pages_spec(&pdf_pages);
-                                modules::doc::pdf_crop(&input, &out_str, pdf_crop_x, pdf_crop_y, pdf_crop_w, pdf_crop_h, pages_opt.as_deref()).is_ok()
-                            },
-                            "pdf_organize" => {
-                                let ordre: Vec<u32> = pdf_nouvel_ordre.split(',')
-                                    .filter_map(|s| s.trim().parse::<u32>().ok())
-                                    .collect();
-                                if ordre.is_empty() { false }
-                                else { modules::doc::pdf_organiser(&input, &out_str, &ordre).is_ok() }
-                            },
-                            "pdf_delete_pages" => {
-                                let pages_a_sup: Vec<u32> = pdf_pages.split(',')
-                                    .filter_map(|s| s.trim().parse::<u32>().ok())
-                                    .collect();
-                                if pages_a_sup.is_empty() { false }
-                                else { modules::doc::pdf_supprimer_pages(&input, &out_str, &pages_a_sup).is_ok() }
-                            },
-                            "pdf_numbers" => {
-                                let position = match pdf_num_position.as_str() {
-                                    "BasGauche"  => modules::doc::PositionNumero::BasGauche,
-                                    "BasDroite"  => modules::doc::PositionNumero::BasDroite,
-                                    "HautCentre" => modules::doc::PositionNumero::HautCentre,
-                                    "HautGauche" => modules::doc::PositionNumero::HautGauche,
-                                    "HautDroite" => modules::doc::PositionNumero::HautDroite,
-                                    _            => modules::doc::PositionNumero::BasCentre,
-                                };
-                                modules::doc::pdf_numeroter(&input, &out_str, pdf_num_debut, position, pdf_num_taille).is_ok()
-                            },
-                            "pdf_protect" => modules::doc::pdf_proteger(&input, &out_str, &pdf_owner_pass, &pdf_user_pass, pdf_allow_print, pdf_allow_copy).is_ok(),
-                            "pdf_unlock" => modules::doc::pdf_dechiffrer(&input, &out_str, &pdf_unlock_pass).is_ok(),
-                            "pdf_repair" => modules::doc::pdf_reparer(&input, &out_str).is_ok(),
-                            "pdf_watermark" => {
-                                let pages_opt = parse_pages_spec(&pdf_pages);
-                                modules::doc::pdf_watermark(&input, &out_str, &pdf_wm_texte, pdf_wm_taille, pdf_wm_opacite, pages_opt.as_deref()).is_ok()
-                            },
-                            _ => modules::doc::convertir(&input, &out_str),
-                        }
-                    },
-                    ModuleType::Image => {
-                        match img_action.as_str() {
-                            "convert" => modules::pic::compresser(&input, &out_str, ratio),
-                            "resize" => {
-                                if resize_w > 0 && resize_h > 0 {
-                                    if resize_kb > 0 {
-                                        let temp = format!("{}_temp.{}", out_str, fmt);
-                                        if modules::pic::redimensionner_pixels(&input, &temp, resize_w, resize_h) {
-                                            modules::pic::redimensionner_poids(Path::new(&temp), &out_str, resize_kb)
-                                        } else {
-                                            false
-                                        }
-                                    } else {
-                                        modules::pic::redimensionner_pixels(&input, &out_str, resize_w, resize_h)
-                                    }
-                                } else if resize_kb > 0 {
-                                    modules::pic::redimensionner_poids(&input, &out_str, resize_kb)
-                                } else {
-                                    modules::pic::compresser(&input, &out_str, 1)
-                                }
-                            },
-                            "rotate" => modules::pic::pivoter(&input, &out_str, angle),
-                            "crop" => modules::pic::recadrer(&input, &out_str, crop_x, crop_y, crop_w, crop_h),
-                            _ => modules::pic::compresser(&input, &out_str, ratio),
-                        }
-                    },
-                    _ => true,
+                           #[cfg(feature = "api")]
+                           ModuleType::Audio => {
+                               match modules::audio::convertir(&input, &out_str, "192k") {
+                                   Ok(mut child) => child.wait().is_ok(),
+                           Err(_) => false
+                               }
+                           },
+                           #[cfg(feature = "api")]
+                           ModuleType::Video => {
+                               match modules::video::traiter_video(&input, &out_str, copie, false) {
+                                   Ok(mut child) => child.wait().is_ok(),
+                           Err(_) => false
+                               }
+                           },
+                           ModuleType::Doc => {
+                               match doc_action.as_str() {
+                                   "convert" => {
+                                       let format_entree = modules::doc::detecter_format_entree(&input);
+                                       let format_sortie = modules::doc::detecter_format_sortie(&out_str);
+                                       modules::doc::convertir_avec_formats(&input, &out_str, format_entree, format_sortie)
+                                   },
+                                   "pdf_split" => {
+                                       let output_dir = input.parent().unwrap().join(format!(
+                                           "{}_pages",
+                                           input.file_stem().unwrap_or_default().to_string_lossy()
+                                       ));
+                                       std::fs::create_dir_all(&output_dir).ok();
+                                       modules::doc::pdf_split(&input, output_dir.to_str().unwrap()).is_ok()
+                                   },
+                                   "pdf_merge" => {
+                                       let paths: Vec<&Path> = pdf_merge_list.iter().map(|p| p.as_path()).collect();
+                                       let output_merge = input.parent().unwrap().join("merged_oxyon.pdf");
+                                       modules::doc::pdf_merge(&paths, output_merge.to_str().unwrap()).is_ok()
+                                   },
+                                   "pdf_rotate" => {
+                                       let pages_opt = parse_pages_spec(&pdf_pages);
+                                       modules::doc::pdf_rotate(&input, &out_str, pdf_angle, pages_opt.as_deref()).is_ok()
+                                   },
+                                   "pdf_compress" => modules::doc::pdf_compresser(&input, &out_str).is_ok(),
+                           "pdf_crop" => {
+                               let pages_opt = parse_pages_spec(&pdf_pages);
+                               modules::doc::pdf_crop(&input, &out_str, pdf_crop_x, pdf_crop_y, pdf_crop_w, pdf_crop_h, pages_opt.as_deref()).is_ok()
+                           },
+                           "pdf_organize" => {
+                               let ordre: Vec<u32> = pdf_nouvel_ordre.split(',')
+                               .filter_map(|s| s.trim().parse::<u32>().ok())
+                               .collect();
+                               if ordre.is_empty() { false }
+                               else { modules::doc::pdf_organiser(&input, &out_str, &ordre).is_ok() }
+                           },
+                           "pdf_delete_pages" => {
+                               let pages_a_sup: Vec<u32> = pdf_pages.split(',')
+                               .filter_map(|s| s.trim().parse::<u32>().ok())
+                               .collect();
+                               if pages_a_sup.is_empty() { false }
+                               else { modules::doc::pdf_supprimer_pages(&input, &out_str, &pages_a_sup).is_ok() }
+                           },
+                           "pdf_numbers" => {
+                               let position = match pdf_num_position.as_str() {
+                                   "BasGauche"  => modules::doc::PositionNumero::BasGauche,
+                                   "BasDroite"  => modules::doc::PositionNumero::BasDroite,
+                                   "HautCentre" => modules::doc::PositionNumero::HautCentre,
+                                   "HautGauche" => modules::doc::PositionNumero::HautGauche,
+                                   "HautDroite" => modules::doc::PositionNumero::HautDroite,
+                                   _            => modules::doc::PositionNumero::BasCentre,
+                               };
+                               modules::doc::pdf_numeroter(&input, &out_str, pdf_num_debut, position, pdf_num_taille).is_ok()
+                           },
+                           "pdf_protect" => modules::doc::pdf_proteger(&input, &out_str, &pdf_owner_pass, &pdf_user_pass, pdf_allow_print, pdf_allow_copy).is_ok(),
+                           "pdf_unlock" => modules::doc::pdf_dechiffrer(&input, &out_str, &pdf_unlock_pass).is_ok(),
+                           "pdf_repair" => modules::doc::pdf_reparer(&input, &out_str).is_ok(),
+                           "pdf_watermark" => {
+                               let pages_opt = parse_pages_spec(&pdf_pages);
+                               modules::doc::pdf_watermark(&input, &out_str, &pdf_wm_texte, pdf_wm_taille, pdf_wm_opacite, pages_opt.as_deref()).is_ok()
+                           },
+                           _ => modules::doc::convertir(&input, &out_str),
+                               }
+                           },
+                           ModuleType::Image => {
+                               match img_action.as_str() {
+                                   "convert" => modules::pic::compresser(&input, &out_str, ratio),
+                           "resize" => {
+                               if resize_w > 0 && resize_h > 0 {
+                                   if resize_kb > 0 {
+                                       let temp = format!("{}_temp.{}", out_str, fmt);
+                                       if modules::pic::redimensionner_pixels(&input, &temp, resize_w, resize_h) {
+                                           modules::pic::redimensionner_poids(Path::new(&temp), &out_str, resize_kb)
+                                       } else {
+                                           false
+                                       }
+                                   } else {
+                                       modules::pic::redimensionner_pixels(&input, &out_str, resize_w, resize_h)
+                                   }
+                               } else if resize_kb > 0 {
+                                   modules::pic::redimensionner_poids(&input, &out_str, resize_kb)
+                               } else {
+                                   modules::pic::compresser(&input, &out_str, 1)
+                               }
+                           },
+                           "rotate" => modules::pic::pivoter(&input, &out_str, angle),
+                           "crop" => modules::pic::recadrer(&input, &out_str, crop_x, crop_y, crop_w, crop_h),
+                           _ => modules::pic::compresser(&input, &out_str, ratio),
+                               }
+                           },
+                           _ => true,
                 };
                 if !success {
                     log_error(&format!("Erreur Module {:?} sur {:?}", module, input));
@@ -548,7 +536,6 @@ impl OxyonApp {
         });
     }
 }
-
 impl eframe::App for OxyonApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if ctx.cumulative_pass_nr() == 0 {
@@ -912,21 +899,37 @@ impl eframe::App for OxyonApp {
                 #[cfg(feature = "api")]
                 ModuleType::Scrapper => {
                     ui.horizontal(|ui| {
+                        ui.label("TMDB API Key :");
+                        ui.add(egui::TextEdit::singleline(&mut self.tmdb_api_key).password(true));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Fanart API Key :");
+                        ui.add(egui::TextEdit::singleline(&mut self.fanart_api_key).password(true));
+                    });
+                    if ui.button("💾 Sauvegarder les clés").clicked() {
+                        let content = format!(
+                            "TMDB_API_KEY={}\nFANART_API_KEY={}\n",
+                            self.tmdb_api_key, self.fanart_api_key
+                        );
+                        let _ = std::fs::write(".env", content);
+                    }
+                    ui.separator();
+                    ui.horizontal(|ui| {
                         let search = |is_series: bool, res_arc: Arc<Mutex<Vec<ScrapeEntry>>>, stem: String, ctx_c: egui::Context| {
                             res_arc.lock().unwrap().clear();
                             std::thread::spawn(move || {
                                 if let Ok(results) = modules::scrap::search_tmdb(&stem, is_series) {
                                     for r in results {
                                         let tex = r.poster_path.as_ref()
-                                            .and_then(|p| modules::scrap::download_image_bytes(p))
-                                            .and_then(|b| image::load_from_memory(&b).ok())
-                                            .map(|img| {
-                                                let ci = egui::ColorImage::from_rgba_unmultiplied(
-                                                    [img.width() as usize, img.height() as usize],
-                                                    img.to_rgba8().as_flat_samples().as_slice()
-                                                );
-                                                ctx_c.load_texture(format!("p_{}", r.id), ci, Default::default())
-                                            });
+                                        .and_then(|p| modules::scrap::download_image_bytes(p))
+                                        .and_then(|b| image::load_from_memory(&b).ok())
+                                        .map(|img| {
+                                            let ci = egui::ColorImage::from_rgba_unmultiplied(
+                                                [img.width() as usize, img.height() as usize],
+                                                                                              img.to_rgba8().as_flat_samples().as_slice()
+                                            );
+                                            ctx_c.load_texture(format!("p_{}", r.id), ci, Default::default())
+                                        });
                                         res_arc.lock().unwrap().push(ScrapeEntry { data: r, texture: tex });
                                         ctx_c.request_repaint();
                                     }
@@ -990,26 +993,6 @@ impl eframe::App for OxyonApp {
                             }
                         });
                         ui.label("💡 Plus = plus rapide mais plus de charge CPU");
-                        #[cfg(feature = "api")]
-                        {
-                            ui.separator();
-                            ui.heading("API Keys");
-                            ui.horizontal(|ui| {
-                                ui.label("TMDB API Key :");
-                                ui.add(egui::TextEdit::singleline(&mut self.tmdb_api_key).password(true));
-                            });
-                            ui.horizontal(|ui| {
-                                ui.label("Fanart API Key :");
-                                ui.add(egui::TextEdit::singleline(&mut self.fanart_api_key).password(true));
-                            });
-                            if ui.button("💾 Sauvegarder les clés").clicked() {
-                                let content = format!(
-                                    "TMDB_API_KEY={}\nFANART_API_KEY={}\n",
-                                    self.tmdb_api_key, self.fanart_api_key
-                                );
-                                let _ = std::fs::write(".env", content);
-                            }
-                        }
                     });
                 },
             }
@@ -1061,18 +1044,16 @@ impl eframe::App for OxyonApp {
         });
     }
 }
-
 fn parse_pages_spec(spec: &str) -> Option<Vec<u32>> {
     let trimmed = spec.trim();
     if trimmed.is_empty() || trimmed == "1-end" {
         return None;
     }
     let pages: Vec<u32> = trimmed.split(',')
-        .filter_map(|s| s.trim().parse::<u32>().ok())
-        .collect();
+    .filter_map(|s| s.trim().parse::<u32>().ok())
+    .collect();
     if pages.is_empty() { None } else { Some(pages) }
 }
-
 fn main() -> eframe::Result {
     let _ = modules::binaries::extraire_deps();
     let mut options = eframe::NativeOptions::default();
@@ -1087,13 +1068,13 @@ fn main() -> eframe::Result {
     }
     let result = eframe::run_native(
         &format!("oxyon v{}", VERSION),
-        options,
-        Box::new(|cc| {
-            let mut app = OxyonApp::default();
-            app.load_config();
-            app.apply_theme(&cc.egui_ctx);
-            Ok(Box::new(app))
-        }),
+                                    options,
+                                    Box::new(|cc| {
+                                        let mut app = OxyonApp::default();
+                                        app.load_config();
+                                        app.apply_theme(&cc.egui_ctx);
+                                        Ok(Box::new(app))
+                                    }),
     );
     modules::binaries::cleanup();
     result
