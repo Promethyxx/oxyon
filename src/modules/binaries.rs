@@ -84,7 +84,7 @@ pub fn extraire_deps() -> Result<(), String> {
 
 /// Crée une Command silencieuse (pas de fenêtre CMD sur Windows)
 pub fn silent_cmd(program: PathBuf) -> Command {
-    let mut cmd = Command::new(program);
+    let cmd = Command::new(program);
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;

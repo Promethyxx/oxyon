@@ -1077,16 +1077,16 @@ fn main() -> eframe::Result {
     let _ = modules::binaries::extraire_deps();
     let mut options = eframe::NativeOptions::default();
     #[cfg(target_os = "windows")]
-    let icon_bytes: &[u8] = include_bytes!("../assets/oxyon_icon.ico");
+    let icon_bytes: &[u8] = include_bytes!("../assets/Oxyon_icon.ico");
     #[cfg(not(target_os = "windows"))]
-    let icon_bytes: &[u8] = include_bytes!("../assets/oxyon_icon.png");
+    let icon_bytes: &[u8] = include_bytes!("../assets/Oxyon_icon.png");
     if let Ok(icon_data) = image::load_from_memory(icon_bytes) {
         let icon_rgba = icon_data.to_rgba8();
         let (width, height) = icon_rgba.dimensions();
         options.viewport.icon = Some(std::sync::Arc::new(egui::IconData { rgba: icon_rgba.into_raw(), width, height }));
     }
     let result = eframe::run_native(
-        &format!("OXYON v{}", VERSION),
+        &format!("oxyon v{}", VERSION),
         options,
         Box::new(|cc| {
             let mut app = OxyonApp::default();
