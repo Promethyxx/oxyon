@@ -12,31 +12,31 @@
   <screenshots>
     <screenshot type="default">
       <caption>Archive converter</caption>
-      <image>https://raw.githubusercontent.com/Promethyxx/oxyon/1.3.5/assets/screenshots/Archive.png</image>
+      <image>https://raw.githubusercontent.com/Promethyxx/oxyon/1.3.7/assets/screenshots/Archive.png</image>
     </screenshot>
     <screenshot>
       <caption>Audio converter</caption>
-      <image>https://raw.githubusercontent.com/Promethyxx/oxyon/1.3.5/assets/screenshots/Audio.png</image>
+      <image>https://raw.githubusercontent.com/Promethyxx/oxyon/1.3.7/assets/screenshots/Audio.png</image>
     </screenshot>
     <screenshot>
       <caption>Document converter</caption>
-      <image>https://raw.githubusercontent.com/Promethyxx/oxyon/1.3.5/assets/screenshots/Doc.png</image>
+      <image>https://raw.githubusercontent.com/Promethyxx/oxyon/1.3.7/assets/screenshots/Doc.png</image>
     </screenshot>
     <screenshot>
       <caption>Picture converter</caption>
-      <image>https://raw.githubusercontent.com/Promethyxx/oxyon/1.3.5/assets/screenshots/Picture.png</image>
+      <image>https://raw.githubusercontent.com/Promethyxx/oxyon/1.3.7/assets/screenshots/Picture.png</image>
     </screenshot>
     <screenshot>
       <caption>Scraper interface</caption>
-      <image>https://raw.githubusercontent.com/Promethyxx/oxyon/1.3.5/assets/screenshots/Scrap.png</image>
+      <image>https://raw.githubusercontent.com/Promethyxx/oxyon/1.3.7/assets/screenshots/Scrap.png</image>
     </screenshot>
     <screenshot>
       <caption>Media tagger</caption>
-      <image>https://raw.githubusercontent.com/Promethyxx/oxyon/1.3.5/assets/screenshots/Tag.png</image>
+      <image>https://raw.githubusercontent.com/Promethyxx/oxyon/1.3.7/assets/screenshots/Tag.png</image>
     </screenshot>
     <screenshot>
       <caption>Video converter</caption>
-      <image>https://raw.githubusercontent.com/Promethyxx/oxyon/1.3.5/assets/screenshots/Video.png</image>
+      <image>https://raw.githubusercontent.com/Promethyxx/oxyon/1.3.7/assets/screenshots/Video.png</image>
     </screenshot>
   </screenshots>
   <url type="homepage">https://github.com/promethyxx/Oxyon</url>
@@ -44,7 +44,7 @@
     <binary>oxyon</binary>
   </provides>
   <releases>
-    <release version="1.3.5" date="2026-02-12"/>
+    <release version="1.3.7" date="2026-02-15"/>
   </releases>
   <developer id="io.github.promethyxx">
     <name>Promethyxx</name>
