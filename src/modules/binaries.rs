@@ -80,7 +80,7 @@ pub fn extraire_deps() -> Result<(), String> {
 //  HELPERS
 // ════════════════════════════════════════════════════════════════════════
 pub fn silent_cmd(program: PathBuf) -> Command {
-    let cmd = Command::new(program);
+    let mut cmd = Command::new(program);
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
