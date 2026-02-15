@@ -1,11 +1,9 @@
 # Rust
 /target
-/tests
 /bin-linux-arm
 /bin-linux-x64
 /bin-mac-arm
 **/*.rs.bk
-.gitlab-ci.yml
 
 # Archives
 *.zip
