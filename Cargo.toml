@@ -45,5 +45,6 @@ lto = true
 codegen-units = 1
 
 [features]
-default = ["api"]
+default = ["api", "bundled"]
 api = []
+bundled = []

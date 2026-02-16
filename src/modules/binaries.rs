@@ -7,35 +7,31 @@ const EXT: &str = ".exe";
 #[cfg(not(target_os = "windows"))]
 const EXT: &str = "";
 
-fn is_flatpak() -> bool {
-    std::env::var("FLATPAK_ID").is_ok()
-}
-
 // ════════════════════════════════════════════════════════════════════════
 //  BINAIRES EMBARQUÉS PAR PLATEFORME
 // ════════════════════════════════════════════════════════════════════════
-#[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+#[cfg(all(feature = "bundled", target_os = "windows", target_arch = "x86_64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin/ffmpeg.exe");
     pub const FFPROBE:     &[u8] = include_bytes!("../../bin/ffprobe.exe");
     pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin/mkvpropedit.exe");
     pub const PANDOC:      &[u8] = include_bytes!("../../bin/pandoc.exe");
 }
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[cfg(all(feature = "bundled", target_os = "linux", target_arch = "x86_64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin-linux-x64/ffmpeg");
     pub const FFPROBE:     &[u8] = include_bytes!("../../bin-linux-x64/ffprobe");
     pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-linux-x64/mkvpropedit");
     pub const PANDOC:      &[u8] = include_bytes!("../../bin-linux-x64/pandoc");
 }
-#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+#[cfg(all(feature = "bundled", target_os = "linux", target_arch = "aarch64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin-linux-arm/ffmpeg");
     pub const FFPROBE:     &[u8] = include_bytes!("../../bin-linux-arm/ffprobe");
     pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-linux-arm/mkvpropedit");
     pub const PANDOC:      &[u8] = include_bytes!("../../bin-linux-arm/pandoc");
 }
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[cfg(all(feature = "bundled", target_os = "macos", target_arch = "aarch64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin-mac-arm/ffmpeg");
     pub const FFPROBE:     &[u8] = include_bytes!("../../bin-mac-arm/ffprobe");
@@ -47,33 +43,37 @@ mod embedded {
 //  EXTRACTION
 // ════════════════════════════════════════════════════════════════════════
 pub fn extraire_deps() -> Result<(), String> {
-    if is_flatpak() {
+    #[cfg(not(feature = "bundled"))]
+    {
         TOOLS_DIR.set(None).ok();
         return Ok(());
     }
-    let temp_dir = std::env::temp_dir().join("oxyon_tools");
-    if !temp_dir.exists() {
-        std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
-    }
-    let f = |name: &str, bytes: &[u8]| -> Result<(), String> {
-        let path = temp_dir.join(name);
-        if !path.exists() {
-            std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
-                .map_err(|e| e.to_string())?;
-            }
+    #[cfg(feature = "bundled")]
+    {
+        let temp_dir = std::env::temp_dir().join("oxyon_tools");
+        if !temp_dir.exists() {
+            std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
         }
+        let f = |name: &str, bytes: &[u8]| -> Result<(), String> {
+            let path = temp_dir.join(name);
+            if !path.exists() {
+                std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+                    .map_err(|e| e.to_string())?;
+                }
+            }
+            Ok(())
+        };
+        f(&format!("ffmpeg{}", EXT),      embedded::FFMPEG)?;
+        f(&format!("ffprobe{}", EXT),     embedded::FFPROBE)?;
+        f(&format!("mkvpropedit{}", EXT), embedded::MKVPROPEDIT)?;
+        f(&format!("pandoc{}", EXT),      embedded::PANDOC)?;
+        TOOLS_DIR.set(Some(temp_dir)).ok();
         Ok(())
-    };
-    f(&format!("ffmpeg{}", EXT),      embedded::FFMPEG)?;
-    f(&format!("ffprobe{}", EXT),     embedded::FFPROBE)?;
-    f(&format!("mkvpropedit{}", EXT), embedded::MKVPROPEDIT)?;
-    f(&format!("pandoc{}", EXT),      embedded::PANDOC)?;
-    TOOLS_DIR.set(Some(temp_dir)).ok();
-    Ok(())
+    }
 }
 
 // ════════════════════════════════════════════════════════════════════════
