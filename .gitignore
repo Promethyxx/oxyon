@@ -4,7 +4,7 @@
 /bin-linux-x64
 /bin-mac-arm
 **/*.rs.bk
-
+/vendor
 # Archives
 *.zip
 *.7z
