@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::OnceLock;
+
 static TOOLS_DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
+
 #[cfg(target_os = "windows")]
 const EXT: &str = ".exe";
 #[cfg(not(target_os = "windows"))]
@@ -43,11 +45,6 @@ mod embedded {
 //  EXTRACTION
 // ════════════════════════════════════════════════════════════════════════
 pub fn extraire_deps() -> Result<(), String> {
-    #[cfg(not(feature = "bundled"))]
-    {
-        TOOLS_DIR.set(None).ok();
-        return Ok(());
-    }
     #[cfg(feature = "bundled")]
     {
         let temp_dir = std::env::temp_dir().join("oxyon_tools");
@@ -67,11 +64,17 @@ pub fn extraire_deps() -> Result<(), String> {
             }
             Ok(())
         };
-        f(&format!("ffmpeg{}", EXT),      embedded::FFMPEG)?;
-        f(&format!("ffprobe{}", EXT),     embedded::FFPROBE)?;
-        f(&format!("mkvpropedit{}", EXT), embedded::MKVPROPEDIT)?;
-        f(&format!("pandoc{}", EXT),      embedded::PANDOC)?;
+        f(&format!("ffmpeg{EXT}"),      embedded::FFMPEG)?;
+        f(&format!("ffprobe{EXT}"),     embedded::FFPROBE)?;
+        f(&format!("mkvpropedit{EXT}"), embedded::MKVPROPEDIT)?;
+        f(&format!("pandoc{EXT}"),      embedded::PANDOC)?;
         TOOLS_DIR.set(Some(temp_dir)).ok();
+        return Ok(());
+    }
+    // Sans feature bundled (Flatpak, système) : les binaires sont dans /app/bin/ ou $PATH
+    #[allow(unreachable_code)]
+    {
+        TOOLS_DIR.set(None).ok();
         Ok(())
     }
 }
@@ -91,15 +94,16 @@ pub fn silent_cmd(program: PathBuf) -> Command {
 }
 
 fn get_tool(name: &str) -> PathBuf {
-    match TOOLS_DIR.get().expect("extraire_deps doit être appelé d'abord") {
-        Some(dir) => dir.join(format!("{}{}", name, EXT)),
-        None => PathBuf::from(format!("/app/bin/{}", name)),
+    // Si extraire_deps() n'a pas encore été appelé, on retourne directement /app/bin/
+    match TOOLS_DIR.get() {
+        Some(Some(dir)) => dir.join(format!("{name}{EXT}")),
+        _ => PathBuf::from(format!("/app/bin/{name}")),
     }
 }
 
-pub fn get_ffmpeg() -> PathBuf { get_tool("ffmpeg") }
-pub fn get_ffprobe() -> PathBuf { get_tool("ffprobe") }
-pub fn get_pandoc() -> PathBuf { get_tool("pandoc") }
+pub fn get_ffmpeg()      -> PathBuf { get_tool("ffmpeg") }
+pub fn get_ffprobe()     -> PathBuf { get_tool("ffprobe") }
+pub fn get_pandoc()      -> PathBuf { get_tool("pandoc") }
 pub fn get_mkvpropedit() -> PathBuf { get_tool("mkvpropedit") }
 
 pub fn cleanup() {
