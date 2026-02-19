@@ -7,7 +7,7 @@ license = "GPL-3.0-or-later"
 [dependencies]
 chrono = "0.4.43"
 dotenvy = "0.15"
-eframe = "0.29"
+eframe = "0.33.3"
 flate2 = "1.1"
 image = { version = "0.25", features = ["avif", "exr", "gif", "hdr", "ico", "jpeg", "png", "tiff", "webp"] }
 kamadak-exif = "0.6.1"
