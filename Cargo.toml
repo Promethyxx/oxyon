@@ -27,7 +27,7 @@ tiny-skia = "0.11"
 toml = "1.0.3"
 usvg = "0.44"
 which = "8.0.0"
-zip = { version = "7.1", default-features = false, features = ["deflate"] }
+zip = { version = "8.1", default-features = false, features = ["deflate"] }
 
 [build-dependencies]
 winres = "0.1"
