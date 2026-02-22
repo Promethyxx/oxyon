@@ -1,6 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-mod modules;
+pub mod modules;
+#[cfg(test)]
+#[path = "test.rs"]
+mod test;
 use eframe::egui;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};

@@ -5,6 +5,7 @@
 /bin-mac-arm
 **/*.rs.bk
 /vendor
+tests/_output/
 # Archives
 *.zip
 *.7z
