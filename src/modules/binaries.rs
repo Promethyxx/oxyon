@@ -48,6 +48,7 @@ pub fn extraire_deps() -> Result<(), String> {
     #[cfg(feature = "bundled")]
     {
         let temp_dir = std::env::temp_dir().join("oxyon_tools");
+        crate::log_info(&format!("binaries::extraire_deps | dossier temp={:?}", temp_dir));
         if !temp_dir.exists() {
             std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
         }
@@ -61,6 +62,9 @@ pub fn extraire_deps() -> Result<(), String> {
                     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
                     .map_err(|e| e.to_string())?;
                 }
+                crate::log_info(&format!("binaries::extraire_deps | extrait {}", name));
+            } else {
+                crate::log_info(&format!("binaries::extraire_deps | déjà présent {}", name));
             }
             Ok(())
         };
@@ -74,6 +78,7 @@ pub fn extraire_deps() -> Result<(), String> {
     // Sans feature bundled (Flatpak, système) : les binaires sont dans /app/bin/ ou $PATH
     #[allow(unreachable_code)]
     {
+        crate::log_info("binaries::extraire_deps | mode système (pas de bundled), binaires depuis PATH ou /app/bin/");
         TOOLS_DIR.set(None).ok();
         Ok(())
     }
@@ -94,7 +99,6 @@ pub fn silent_cmd(program: PathBuf) -> Command {
 }
 
 fn get_tool(name: &str) -> PathBuf {
-    // Si extraire_deps() n'a pas encore été appelé, on retourne directement /app/bin/
     match TOOLS_DIR.get() {
         Some(Some(dir)) => dir.join(format!("{name}{EXT}")),
         _ => PathBuf::from(format!("/app/bin/{name}")),

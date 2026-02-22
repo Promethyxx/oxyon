@@ -117,14 +117,27 @@ fn extraire_tar(input: &Path, destination: &str) -> Result<(), String> {
 
 /// Compression : cree une archive (7z, zip, tar)
 pub fn compresser(input: &Path, output: &str, format_archive: &str) -> bool {
+    crate::log_info(&format!(
+        "archive::compresser | format={} | {:?} -> {} | est_dossier={}",
+        format_archive, input, output, input.is_dir()
+    ));
+    if input.is_dir() {
+        // Compter les fichiers pour anticiper la durée
+        let nb = std::fs::read_dir(input).map(|d| d.count()).unwrap_or(0);
+        crate::log_info(&format!("archive::compresser | dossier avec ~{} entrées", nb));
+    } else {
+        let taille = std::fs::metadata(input).map(|m| m.len()).unwrap_or(0);
+        crate::log_info(&format!("archive::compresser | fichier taille={} octets ({:.1} Mo)", taille, taille as f64 / 1_048_576.0));
+    }
     let result = match format_archive.to_lowercase().as_str() {
         "zip" => compresser_zip(input, output),
         "7z"  => compresser_7z(input, output),
         "tar" | "tar.gz" | "tgz" => compresser_tar(input, output),
         _ => Err(format!("Format d'archive non supporte : {}", format_archive)),
     };
-    if let Err(e) = &result {
-        eprintln!("Erreur compression : {}", e);
+    match &result {
+        Ok(()) => crate::log_info(&format!("archive::compresser OK | {}", output)),
+        Err(e) => crate::log_error(&format!("archive::compresser ÉCHEC | format={} | {:?} | raison={}", format_archive, input, e)),
     }
     result.is_ok()
 }
@@ -135,6 +148,11 @@ pub fn extraire(input: &Path, destination: &str) -> bool {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_lowercase();
+    let taille = std::fs::metadata(input).map(|m| m.len()).unwrap_or(0);
+    crate::log_info(&format!(
+        "archive::extraire | ext={} | taille={:.1} Mo | {:?} -> {}",
+        ext, taille as f64 / 1_048_576.0, input, destination
+    ));
 
     let result = match ext.as_str() {
         "zip" => extraire_zip(input, destination),
@@ -155,7 +173,9 @@ pub fn extraire(input: &Path, destination: &str) -> bool {
         _ => Err(format!("Format d'archive non reconnu : .{}", ext)),
     };
     if let Err(e) = &result {
-        eprintln!("Erreur extraction : {}", e);
+        crate::log_error(&format!("archive::extraire ÉCHEC | ext={} | {:?} | raison={}", ext, input, e));
+    } else {
+        crate::log_info(&format!("archive::extraire OK | {:?}", input));
     }
     result.is_ok()
 }
@@ -176,18 +196,4 @@ pub fn convertir(input: &Path, format_cible: &str) -> bool {
     // 3. Nettoyer
     let _ = fs::remove_dir_all(&temp_dir);
     success
-}
-
-/// Division : Coupe en volumes — non supporte nativement par les crates Rust
-/// Retourne false avec un message
-pub fn diviser(_input: &Path, _output: &str, _taille_volume: &str) -> bool {
-    eprintln!("Division en volumes non supportee en mode natif");
-    false
-}
-
-/// Fusion : Reconstruit depuis le premier volume
-/// Retourne false avec un message
-pub fn fusionner(_premier_volume: &Path, _destination: &str) -> bool {
-    eprintln!("Fusion de volumes non supportee en mode natif");
-    false
 }

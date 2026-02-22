@@ -10,6 +10,11 @@ pub fn traiter_video(
     copie_flux: bool,
     est_audio_uniquement: bool,
 ) -> Result<Child, std::io::Error> {
+    let ffmpeg = binaries::get_ffmpeg();
+    crate::log_info(&format!(
+        "video::traiter_video | ffmpeg={:?} | copie_flux={} | audio_only={} | {:?} -> {}",
+        ffmpeg, copie_flux, est_audio_uniquement, input, output
+    ));
     let mut args = vec!["-i", input.to_str().unwrap()];
 
     if copie_flux {
@@ -24,7 +29,15 @@ pub fn traiter_video(
 
     args.extend(vec!["-y", output]);
 
-    binaries::silent_cmd(binaries::get_ffmpeg()).args(&args).spawn()
+    let child = binaries::silent_cmd(binaries::get_ffmpeg())
+        .args(&args)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn();
+    if let Err(ref e) = child {
+        crate::log_error(&format!("video::traiter_video impossible de lancer ffmpeg : {}", e));
+    }
+    child
 }
 
 /// Analyse le codec audio d'un fichier via ffprobe

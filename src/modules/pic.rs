@@ -51,6 +51,7 @@ impl ImageFormat {
 
 /// Redimensionne l'image (Compression par dimension)
 pub fn compresser(input: &Path, output: &str, ratio: u32) -> bool {
+    crate::log_info(&format!("pic::compresser | ratio={} | {:?} -> {}", ratio, input, output));
     // Détection du format d'entrée
     if let Some(ext) = input.extension().and_then(|e| e.to_str()) {
         match ext.to_lowercase().as_str() {
@@ -62,13 +63,24 @@ pub fn compresser(input: &Path, output: &str, ratio: u32) -> bool {
     }
 
     // Format standard supporté par image crate
-    if let Ok(img) = image::open(input) {
-        let (w, h) = (img.width(), img.height());
-        // Ratio de 2 = divise par 2 la largeur et hauteur
-        let scaled = img.resize(w / ratio, h / ratio, FilterType::Lanczos3);
-        scaled.save(output).is_ok()
-    } else {
-        false
+    match image::open(input) {
+        Ok(img) => {
+            let (w, h) = (img.width(), img.height());
+            if ratio == 0 {
+                crate::log_error(&format!("pic::compresser ratio=0 invalide pour {:?}", input));
+                return false;
+            }
+            let scaled = img.resize(w / ratio, h / ratio, FilterType::Lanczos3);
+            let ok = scaled.save(output).is_ok();
+            if !ok {
+                crate::log_error(&format!("pic::compresser échec save | {:?} -> {}", input, output));
+            }
+            ok
+        },
+        Err(e) => {
+            crate::log_error(&format!("pic::compresser impossible d'ouvrir {:?} : {}", input, e));
+            false
+        }
     }
 }
 
@@ -122,16 +134,26 @@ pub fn supprimer_exif(input: &Path, output: &str) -> bool {
 
 /// Rotation simple (90, 180, 270)
 pub fn pivoter(input: &Path, output: &str, angle: u32) -> bool {
-    if let Ok(img) = image::open(input) {
-        let rotated = match angle {
-            90 => img.rotate90(),
-            180 => img.rotate180(),
-            270 => img.rotate270(),
-            _ => img,
-        };
-        rotated.save(output).is_ok()
-    } else {
-        false
+    crate::log_info(&format!("pic::pivoter | angle={} | {:?} -> {}", angle, input, output));
+    match image::open(input) {
+        Ok(img) => {
+            let rotated = match angle {
+                90 => img.rotate90(),
+                180 => img.rotate180(),
+                270 => img.rotate270(),
+                _ => {
+                    crate::log_warn(&format!("pic::pivoter angle invalide {} pour {:?}, image non modifiée", angle, input));
+                    img
+                }
+            };
+            let ok = rotated.save(output).is_ok();
+            if !ok { crate::log_error(&format!("pic::pivoter échec save {:?}", output)); }
+            ok
+        },
+        Err(e) => {
+            crate::log_error(&format!("pic::pivoter impossible d'ouvrir {:?} : {}", input, e));
+            false
+        }
     }
 }
 
@@ -139,43 +161,65 @@ pub fn pivoter(input: &Path, output: &str, angle: u32) -> bool {
 /// x, y = coin supérieur gauche (0-100)
 /// width, height = dimensions du crop (0-100)
 pub fn recadrer(input: &Path, output: &str, x_pct: u32, y_pct: u32, width_pct: u32, height_pct: u32) -> bool {
-    if let Ok(img) = image::open(input) {
-        let (img_w, img_h) = (img.width(), img.height());
-        
-        // Convertir pourcentages en pixels
-        let x = (img_w * x_pct) / 100;
-        let y = (img_h * y_pct) / 100;
-        let width = (img_w * width_pct) / 100;
-        let height = (img_h * height_pct) / 100;
-        
-        // Vérifier les limites
-        if x + width > img_w || y + height > img_h {
-            return false;
+    crate::log_info(&format!("pic::recadrer | x={}% y={}% w={}% h={}% | {:?} -> {}", x_pct, y_pct, width_pct, height_pct, input, output));
+    match image::open(input) {
+        Ok(img) => {
+            let (img_w, img_h) = (img.width(), img.height());
+            
+            // Convertir pourcentages en pixels
+            let x = (img_w * x_pct) / 100;
+            let y = (img_h * y_pct) / 100;
+            let width = (img_w * width_pct) / 100;
+            let height = (img_h * height_pct) / 100;
+            
+            // Vérifier les limites
+            if x + width > img_w || y + height > img_h {
+                crate::log_error(&format!(
+                    "pic::recadrer crop hors limites | image={}x{} | crop x={} y={} w={} h={} | {:?}",
+                    img_w, img_h, x, y, width, height, input
+                ));
+                return false;
+            }
+            
+            let cropped = img.crop_imm(x, y, width, height);
+            let ok = cropped.save(output).is_ok();
+            if !ok { crate::log_error(&format!("pic::recadrer échec save {:?}", output)); }
+            ok
+        },
+        Err(e) => {
+            crate::log_error(&format!("pic::recadrer impossible d'ouvrir {:?} : {}", input, e));
+            false
         }
-        
-        let cropped = img.crop_imm(x, y, width, height);
-        cropped.save(output).is_ok()
-    } else {
-        false
     }
 }
 
 /// Redimensionne à une largeur/hauteur spécifique en pixels
 pub fn redimensionner_pixels(input: &Path, output: &str, target_width: u32, target_height: u32) -> bool {
-    if let Ok(img) = image::open(input) {
-        let resized = img.resize_exact(target_width, target_height, FilterType::Lanczos3);
-        resized.save(output).is_ok()
-    } else {
-        false
+    crate::log_info(&format!("pic::redimensionner_pixels | {}x{} | {:?} -> {}", target_width, target_height, input, output));
+    match image::open(input) {
+        Ok(img) => {
+            let resized = img.resize_exact(target_width, target_height, FilterType::Lanczos3);
+            let ok = resized.save(output).is_ok();
+            if !ok { crate::log_error(&format!("pic::redimensionner_pixels échec save {:?}", output)); }
+            ok
+        },
+        Err(e) => {
+            crate::log_error(&format!("pic::redimensionner_pixels impossible d'ouvrir {:?} : {}", input, e));
+            false
+        }
     }
 }
 
 /// Redimensionne pour atteindre un poids maximum (en Ko)
 /// Réduit progressivement jusqu'à atteindre le poids cible
 pub fn redimensionner_poids(input: &Path, output: &str, max_size_kb: u32) -> bool {
+    crate::log_info(&format!("pic::redimensionner_poids | max={}Ko | {:?} -> {}", max_size_kb, input, output));
     let img = match image::open(input) {
         Ok(i) => i,
-        Err(_) => return false,
+        Err(e) => {
+            crate::log_error(&format!("pic::redimensionner_poids impossible d'ouvrir {:?} : {}", input, e));
+            return false;
+        }
     };
     
     let (orig_w, orig_h) = (img.width(), img.height());
@@ -187,21 +231,23 @@ pub fn redimensionner_poids(input: &Path, output: &str, max_size_kb: u32) -> boo
         let new_h = orig_h / ratio;
         
         if new_w < 10 || new_h < 10 {
-            break; // Trop petit
+            crate::log_warn(&format!("pic::redimensionner_poids trop petit à ratio={} ({}x{}) pour {:?}", ratio, new_w, new_h, input));
+            break;
         }
         
         let resized = img.resize(new_w, new_h, FilterType::Lanczos3);
         
-        // Sauvegarder temporairement pour vérifier la taille
         if resized.save(output).is_ok() {
             if let Ok(metadata) = std::fs::metadata(output) {
+                crate::log_info(&format!("pic::redimensionner_poids ratio={} -> {}Ko (cible={}Ko)", ratio, metadata.len() / 1024, max_size_kb));
                 if metadata.len() <= max_size_bytes {
-                    return true; // Taille atteinte !
+                    return true;
                 }
             }
         }
     }
     
+    crate::log_error(&format!("pic::redimensionner_poids impossible d'atteindre {}Ko pour {:?}", max_size_kb, input));
     false
 }
 

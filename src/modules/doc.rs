@@ -63,20 +63,49 @@ impl FormatSortie {
 // ════════════════════════════════════════════════════════════════════════
 
 pub fn convertir(input: &Path, output: &str) -> bool {
-    binaries::silent_cmd(binaries::get_pandoc())
+    let pandoc = binaries::get_pandoc();
+    crate::log_info(&format!("doc::convertir | pandoc={:?} | {:?} -> {}", pandoc, input, output));
+    let result = binaries::silent_cmd(pandoc)
         .arg(input.to_str().unwrap())
         .arg("-o").arg(output)
-        .status()
-        .map(|s| s.success()).unwrap_or(false)
+        .output();
+    match result {
+        Ok(out) => {
+            let success = out.status.success();
+            if !success {
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                crate::log_error(&format!("doc::convertir ÉCHEC | code={:?} | stderr={}", out.status.code(), stderr.trim()));
+            }
+            success
+        },
+        Err(e) => {
+            crate::log_error(&format!("doc::convertir impossible de lancer pandoc : {}", e));
+            false
+        }
+    }
 }
 
 pub fn extraire_texte(input: &Path, output: &str) -> bool {
-    binaries::silent_cmd(binaries::get_pandoc())
+    let pandoc = binaries::get_pandoc();
+    crate::log_info(&format!("doc::extraire_texte | pandoc={:?} | {:?} -> {}", pandoc, input, output));
+    let result = binaries::silent_cmd(pandoc)
         .arg(input.to_str().unwrap())
         .arg("-t").arg("plain")
         .arg("-o").arg(output)
-        .status()
-        .map(|s| s.success()).unwrap_or(false)
+        .output();
+    match result {
+        Ok(out) => {
+            let success = out.status.success();
+            if !success {
+                crate::log_error(&format!("doc::extraire_texte ÉCHEC | stderr={}", String::from_utf8_lossy(&out.stderr).trim()));
+            }
+            success
+        },
+        Err(e) => {
+            crate::log_error(&format!("doc::extraire_texte impossible de lancer pandoc : {}", e));
+            false
+        }
+    }
 }
 
 pub fn convertir_avec_formats(
@@ -84,12 +113,38 @@ pub fn convertir_avec_formats(
     format_entree: Option<FormatEntree>,
     format_sortie: Option<FormatSortie>,
 ) -> bool {
-    let mut cmd = binaries::silent_cmd(binaries::get_pandoc());
+    let pandoc = binaries::get_pandoc();
+    crate::log_info(&format!(
+        "doc::convertir_avec_formats | pandoc={:?} | entree={:?} sortie={:?} | {:?} -> {}",
+        pandoc, format_entree, format_sortie, input, output
+    ));
+    // Vérifier que le fichier source existe
+    if !input.exists() {
+        crate::log_error(&format!("doc::convertir_avec_formats fichier source introuvable : {:?}", input));
+        return false;
+    }
+    let mut cmd = binaries::silent_cmd(pandoc);
     if let Some(fmt) = format_entree { cmd.arg("-f").arg(fmt.to_pandoc_arg()); }
     cmd.arg(input.to_str().unwrap());
     if let Some(fmt) = format_sortie { cmd.arg("-t").arg(fmt.to_pandoc_arg()); }
     cmd.arg("-o").arg(output);
-    cmd.status().map(|s| s.success()).unwrap_or(false)
+    match cmd.output() {
+        Ok(out) => {
+            let success = out.status.success();
+            if !success {
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                crate::log_error(&format!(
+                    "doc::convertir_avec_formats ÉCHEC | code={:?} | pandoc stderr={}",
+                    out.status.code(), stderr.trim()
+                ));
+            }
+            success
+        },
+        Err(e) => {
+            crate::log_error(&format!("doc::convertir_avec_formats impossible de lancer pandoc : {}", e));
+            false
+        }
+    }
 }
 
 pub fn convertir_csv(input: &Path, output: &str, fmt: FormatSortie) -> bool {
@@ -178,6 +233,7 @@ fn vers_pdf_temp(input: &Path) -> Result<String, String> {
     ));
     let tmp_str = tmp.to_str().ok_or("Chemin temp invalide")?;
     let format_in = detecter_format_entree(input);
+    crate::log_info(&format!("vers_pdf_temp | {:?} -> {} | format_in={:?}", input, tmp_str, format_in));
     if convertir_avec_formats(input, tmp_str, format_in, Some(FormatSortie::Pdf)) {
         Ok(tmp_str.to_string())
     } else {
@@ -214,11 +270,12 @@ where
     F: FnOnce(&Path, &str) -> Result<(), String>,
 {
     if est_pdf(input) {
-        // Entrée PDF : application directe
+        crate::log_info(&format!("appliquer_operation_doc | PDF direct | {:?} -> {}", input, output));
         return op_pdf(input, output);
     }
 
     // Entrée non-PDF : conversion → traitement → reconversion
+    crate::log_info(&format!("appliquer_operation_doc | non-PDF, conversion intermédiaire | {:?}", input));
     let pdf_in = vers_pdf_temp(input)?;
     let pdf_out = format!("{}_out.pdf", pdf_in.trim_end_matches(".pdf"));
 
@@ -410,6 +467,8 @@ fn pdf_split_interne(input: &Path, output_dir: &str) -> Result<Vec<String>, Stri
         return Err("Le PDF ne contient aucune page".into());
     }
 
+    crate::log_info(&format!("pdf_split_interne | {:?} | {} pages -> {}", input, pages.len(), output_dir));
+
     let base_name = input.file_stem().unwrap_or_default().to_string_lossy();
     let mut fichiers = Vec::new();
 
@@ -479,6 +538,10 @@ pub fn pdf_split(input: &Path, output_dir: &str) -> Result<Vec<String>, String> 
 pub fn pdf_merge(inputs: &[&Path], output: &str) -> Result<(), String> {
     if inputs.is_empty() {
         return Err("Aucun fichier à fusionner".into());
+    }
+    crate::log_info(&format!("pdf_merge | {} fichier(s) -> {}", inputs.len(), output));
+    for (i, p) in inputs.iter().enumerate() {
+        crate::log_info(&format!("  [{}] {:?}", i+1, p));
     }
 
     // Convertir les non-PDF en PDF temporaire
@@ -649,8 +712,13 @@ fn pdf_compresser_interne(input: &Path, output: &str) -> Result<u64, String> {
 }
 
 pub fn pdf_compresser(input: &Path, output: &str) -> Result<u64, String> {
+    crate::log_info(&format!("pdf_compresser | {:?} -> {}", input, output));
     if est_pdf(input) {
-        return pdf_compresser_interne(input, output);
+        let result = pdf_compresser_interne(input, output);
+        if let Ok(bytes_gagnés) = &result {
+            crate::log_info(&format!("pdf_compresser OK | {} octets économisés", bytes_gagnés));
+        }
+        return result;
     }
     let pdf_tmp = vers_pdf_temp(input)?;
     let result = pdf_compresser_interne(Path::new(&pdf_tmp), output);
