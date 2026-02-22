@@ -265,19 +265,19 @@ fn convertir_svg(input: &Path, output: &str) -> bool {
         return false;
     }
 
-    let opt = usvg::Options::default();
-    let tree = match usvg::Tree::from_data(&svg_data, &opt) {
+    let opt = resvg::usvg::Options::default();
+    let tree = match resvg::usvg::Tree::from_data(&svg_data, &opt) {
         Ok(t) => t,
         Err(_) => return false,
     };
 
     let size = tree.size();
-    let mut pixmap = match tiny_skia::Pixmap::new(size.width() as u32, size.height() as u32) {
+    let mut pixmap = match resvg::tiny_skia::Pixmap::new(size.width() as u32, size.height() as u32) {
         Some(p) => p,
         None => return false,
     };
     
-    resvg::render(&tree, tiny_skia::Transform::default(), &mut pixmap.as_mut());
+    resvg::render(&tree, resvg::tiny_skia::Transform::default(), &mut pixmap.as_mut());
 
     // Convertir en image::RgbaImage
     let img = match image::RgbaImage::from_raw(
@@ -304,19 +304,19 @@ fn compresser_svg(input: &Path, output: &str, ratio: u32) -> bool {
         return false;
     }
 
-    let opt = usvg::Options::default();
-    let tree = match usvg::Tree::from_data(&svg_data, &opt) {
+    let opt = resvg::usvg::Options::default();
+    let tree = match resvg::usvg::Tree::from_data(&svg_data, &opt) {
         Ok(t) => t,
         Err(_) => return false,
     };
 
     let size = tree.size();
-    let mut pixmap = match tiny_skia::Pixmap::new(size.width() as u32, size.height() as u32) {
+    let mut pixmap = match resvg::tiny_skia::Pixmap::new(size.width() as u32, size.height() as u32) {
         Some(p) => p,
         None => return false,
     };
     
-    resvg::render(&tree, tiny_skia::Transform::default(), &mut pixmap.as_mut());
+    resvg::render(&tree, resvg::tiny_skia::Transform::default(), &mut pixmap.as_mut());
 
     let img = match image::RgbaImage::from_raw(
         pixmap.width(),
