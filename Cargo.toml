@@ -1,6 +1,6 @@
 [package]
 name = "oxyon"
-version = "1.4.1"
+version = "1.5.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 
@@ -9,10 +9,12 @@ chrono = "0.4.43"
 dotenvy = "0.15"
 eframe = "0.33.3"
 flate2 = "1.1"
+html2md = "0.2"
 image = { version = "0.25", features = ["avif", "exr", "gif", "hdr", "ico", "jpeg", "png", "tiff", "webp"] }
 kamadak-exif = "0.6.1"
 lopdf = "0.39"
 psd = "0.3"
+pulldown-cmark = "0.13"
 quick-xml = "0.39.0"
 rawloader = "0.37"
 regex = "1.10"

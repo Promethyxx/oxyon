@@ -262,7 +262,7 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult) {
     }
 
     // Clearlogo via Fanart.tv
-    let fanart_api_key = match std::env::var("FANART_KEY") {
+    let fanart_api_key = match std::env::var("FANART_API_KEY") {
         Ok(k) => k,
         Err(_) => return,
     };
@@ -313,7 +313,7 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult) {
 
 pub fn search_tmdb(query: &str, is_series: bool) -> Result<Vec<ScrapeResult>, String> {
     let _ = dotenvy::dotenv();
-    let api_key = std::env::var("TMDB_KEY").map_err(|_| "TMDB_KEY manquante".to_string())?;
+    let api_key = std::env::var("TMDB_API_KEY").map_err(|_| "TMDB_API_KEY manquante".to_string())?;
 
     let client = Client::builder()
         .user_agent("OXYON/2.1")

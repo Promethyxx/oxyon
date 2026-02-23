@@ -12,3 +12,34 @@
 [2026-02-22 12:14:45] [INFO] [main] binaries::extraire_deps | extrait mkvpropedit.exe
 [2026-02-22 12:14:46] [INFO] [main] binaries::extraire_deps | extrait pandoc.exe
 [2026-02-22 12:14:52] [INFO] [main] === OXYON FERMETURE ===
+[2026-02-22 19:12:52] [INFO] [main] === OXYON v1.4.1 DÉMARRAGE ===
+[2026-02-22 19:12:52] [INFO] [main] binaries::extraire_deps | dossier temp="C:\\Users\\peter\\AppData\\Local\\Temp\\oxyon_tools"
+[2026-02-22 19:12:52] [INFO] [main] binaries::extraire_deps | extrait ffmpeg.exe
+[2026-02-22 19:12:52] [INFO] [main] binaries::extraire_deps | extrait ffprobe.exe
+[2026-02-22 19:12:52] [INFO] [main] binaries::extraire_deps | extrait mkvpropedit.exe
+[2026-02-22 19:12:53] [INFO] [main] binaries::extraire_deps | extrait pandoc.exe
+[2026-02-22 19:14:40] [INFO] [main] === OXYON FERMETURE ===
+[2026-02-23 11:26:04] [INFO] [main] === OXYON v1.5.0 DÉMARRAGE ===
+[2026-02-23 11:26:04] [INFO] [main] binaries::extraire_deps | dossier temp="C:\\Users\\peter\\AppData\\Local\\Temp\\oxyon_tools"
+[2026-02-23 11:26:04] [INFO] [main] binaries::extraire_deps | extrait ffmpeg.exe
+[2026-02-23 11:26:04] [INFO] [main] binaries::extraire_deps | extrait ffprobe.exe
+[2026-02-23 11:26:04] [INFO] [main] binaries::extraire_deps | extrait mkvpropedit.exe
+[2026-02-23 11:26:15] [INFO] [main] === OXYON FERMETURE ===
+[2026-02-23 11:40:51] [INFO] [main] === OXYON v1.5.0 DÉMARRAGE ===
+[2026-02-23 11:40:51] [INFO] [main] binaries::extraire_deps | dossier temp="C:\\Users\\peter\\AppData\\Local\\Temp\\oxyon_tools"
+[2026-02-23 11:40:52] [INFO] [main] binaries::extraire_deps | extrait ffmpeg.exe
+[2026-02-23 11:40:53] [INFO] [main] binaries::extraire_deps | extrait ffprobe.exe
+[2026-02-23 11:40:53] [INFO] [main] binaries::extraire_deps | extrait mkvpropedit.exe
+[2026-02-23 11:49:25] [INFO] [main] === OXYON FERMETURE ===
+[2026-02-23 11:50:25] [INFO] [main] === OXYON v1.5.0 DÉMARRAGE ===
+[2026-02-23 11:50:25] [INFO] [main] binaries::extraire_deps | dossier temp="C:\\Users\\peter\\AppData\\Local\\Temp\\oxyon_tools"
+[2026-02-23 11:50:25] [INFO] [main] binaries::extraire_deps | extrait ffmpeg.exe
+[2026-02-23 11:50:25] [INFO] [main] binaries::extraire_deps | extrait ffprobe.exe
+[2026-02-23 11:50:25] [INFO] [main] binaries::extraire_deps | extrait mkvpropedit.exe
+[2026-02-23 11:52:44] [INFO] [main] === OXYON FERMETURE ===
+[2026-02-23 12:30:53] [INFO] [main] === OXYON v1.5.0 DÉMARRAGE ===
+[2026-02-23 12:30:53] [INFO] [main] binaries::extraire_deps | dossier temp="C:\\Users\\peter\\AppData\\Local\\Temp\\oxyon_tools"
+[2026-02-23 12:30:54] [INFO] [main] binaries::extraire_deps | extrait ffmpeg.exe
+[2026-02-23 12:30:54] [INFO] [main] binaries::extraire_deps | extrait ffprobe.exe
+[2026-02-23 12:30:54] [INFO] [main] binaries::extraire_deps | extrait mkvpropedit.exe
+[2026-02-23 12:50:40] [INFO] [main] === OXYON FERMETURE ===

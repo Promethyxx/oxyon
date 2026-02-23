@@ -17,28 +17,24 @@ mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin/ffmpeg.exe");
     pub const FFPROBE:     &[u8] = include_bytes!("../../bin/ffprobe.exe");
     pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin/mkvpropedit.exe");
-    pub const PANDOC:      &[u8] = include_bytes!("../../bin/pandoc.exe");
 }
 #[cfg(all(feature = "bundled", target_os = "linux", target_arch = "x86_64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin-linux-x64/ffmpeg");
     pub const FFPROBE:     &[u8] = include_bytes!("../../bin-linux-x64/ffprobe");
     pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-linux-x64/mkvpropedit");
-    pub const PANDOC:      &[u8] = include_bytes!("../../bin-linux-x64/pandoc");
 }
 #[cfg(all(feature = "bundled", target_os = "linux", target_arch = "aarch64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin-linux-arm/ffmpeg");
     pub const FFPROBE:     &[u8] = include_bytes!("../../bin-linux-arm/ffprobe");
     pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-linux-arm/mkvpropedit");
-    pub const PANDOC:      &[u8] = include_bytes!("../../bin-linux-arm/pandoc");
 }
 #[cfg(all(feature = "bundled", target_os = "macos", target_arch = "aarch64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin-mac-arm/ffmpeg");
     pub const FFPROBE:     &[u8] = include_bytes!("../../bin-mac-arm/ffprobe");
     pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-mac-arm/mkvpropedit");
-    pub const PANDOC:      &[u8] = include_bytes!("../../bin-mac-arm/pandoc");
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -71,11 +67,9 @@ pub fn extraire_deps() -> Result<(), String> {
         f(&format!("ffmpeg{EXT}"),      embedded::FFMPEG)?;
         f(&format!("ffprobe{EXT}"),     embedded::FFPROBE)?;
         f(&format!("mkvpropedit{EXT}"), embedded::MKVPROPEDIT)?;
-        f(&format!("pandoc{EXT}"),      embedded::PANDOC)?;
         TOOLS_DIR.set(Some(temp_dir)).ok();
         return Ok(());
     }
-    // Sans feature bundled (Flatpak, système) : les binaires sont dans /app/bin/ ou $PATH
     #[allow(unreachable_code)]
     {
         crate::log_info("binaries::extraire_deps | mode système (pas de bundled), binaires depuis PATH ou /app/bin/");
@@ -107,7 +101,6 @@ fn get_tool(name: &str) -> PathBuf {
 
 pub fn get_ffmpeg()      -> PathBuf { get_tool("ffmpeg") }
 pub fn get_ffprobe()     -> PathBuf { get_tool("ffprobe") }
-pub fn get_pandoc()      -> PathBuf { get_tool("pandoc") }
 pub fn get_mkvpropedit() -> PathBuf { get_tool("mkvpropedit") }
 
 pub fn cleanup() {

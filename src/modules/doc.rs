@@ -2,183 +2,25 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
+use std::io::Read;
 
 use lopdf::content::{Content, Operation};
 use lopdf::encryption::crypt_filters::{Aes128CryptFilter, CryptFilter};
 use lopdf::encryption::{EncryptionState, EncryptionVersion, Permissions};
 use lopdf::{dictionary, Document, Object, ObjectId, SaveOptions, Stream};
 
-use crate::modules::binaries;
-
 // ════════════════════════════════════════════════════════════════════════
-//  ENUMS FORMATS PANDOC
+//  ENUMS FORMATS
 // ════════════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone, Copy)]
 pub enum FormatEntree {
-    Docx, Csv, Dotx, Json, Log, Md, Odt, Typst, Yaml, Html, Tex, Rst, Pdf,
+    Docx, Csv, Dotx, Json, Log, Md, Odt, Typst, Yaml, Html, Tex, Rst, Pdf, Txt,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum FormatSortie {
     Docx, Html, Md, Odt, Tex, Plain, Pdf,
-}
-
-impl FormatEntree {
-    pub fn to_pandoc_arg(&self) -> &str {
-        match self {
-            Self::Docx => "docx",
-            Self::Csv  => "csv",
-            Self::Dotx => "docx",
-            Self::Json => "json",
-            Self::Log  => "markdown",
-            Self::Md   => "markdown",
-            Self::Odt  => "odt",
-            Self::Typst => "typst",
-            Self::Yaml => "markdown",
-            Self::Html => "html",
-            Self::Tex  => "latex",
-            Self::Rst  => "rst",
-            Self::Pdf  => "pdf",
-        }
-    }
-}
-
-impl FormatSortie {
-    pub fn to_pandoc_arg(&self) -> &str {
-        match self {
-            Self::Docx  => "docx",
-            Self::Html  => "html",
-            Self::Md    => "markdown",
-            Self::Odt   => "odt",
-            Self::Tex   => "latex",
-            Self::Plain => "plain",
-            Self::Pdf   => "pdf",
-        }
-    }
-}
-
-// ════════════════════════════════════════════════════════════════════════
-//  CONVERSION PANDOC
-// ════════════════════════════════════════════════════════════════════════
-
-pub fn convertir(input: &Path, output: &str) -> bool {
-    let pandoc = binaries::get_pandoc();
-    crate::log_info(&format!("doc::convertir | pandoc={:?} | {:?} -> {}", pandoc, input, output));
-    let result = binaries::silent_cmd(pandoc)
-        .arg(input.to_str().unwrap())
-        .arg("-o").arg(output)
-        .output();
-    match result {
-        Ok(out) => {
-            let success = out.status.success();
-            if !success {
-                let stderr = String::from_utf8_lossy(&out.stderr);
-                crate::log_error(&format!("doc::convertir ÉCHEC | code={:?} | stderr={}", out.status.code(), stderr.trim()));
-            }
-            success
-        },
-        Err(e) => {
-            crate::log_error(&format!("doc::convertir impossible de lancer pandoc : {}", e));
-            false
-        }
-    }
-}
-
-pub fn extraire_texte(input: &Path, output: &str) -> bool {
-    let pandoc = binaries::get_pandoc();
-    crate::log_info(&format!("doc::extraire_texte | pandoc={:?} | {:?} -> {}", pandoc, input, output));
-    let result = binaries::silent_cmd(pandoc)
-        .arg(input.to_str().unwrap())
-        .arg("-t").arg("plain")
-        .arg("-o").arg(output)
-        .output();
-    match result {
-        Ok(out) => {
-            let success = out.status.success();
-            if !success {
-                crate::log_error(&format!("doc::extraire_texte ÉCHEC | stderr={}", String::from_utf8_lossy(&out.stderr).trim()));
-            }
-            success
-        },
-        Err(e) => {
-            crate::log_error(&format!("doc::extraire_texte impossible de lancer pandoc : {}", e));
-            false
-        }
-    }
-}
-
-pub fn convertir_avec_formats(
-    input: &Path, output: &str,
-    format_entree: Option<FormatEntree>,
-    format_sortie: Option<FormatSortie>,
-) -> bool {
-    let pandoc = binaries::get_pandoc();
-    crate::log_info(&format!(
-        "doc::convertir_avec_formats | pandoc={:?} | entree={:?} sortie={:?} | {:?} -> {}",
-        pandoc, format_entree, format_sortie, input, output
-    ));
-    // Vérifier que le fichier source existe
-    if !input.exists() {
-        crate::log_error(&format!("doc::convertir_avec_formats fichier source introuvable : {:?}", input));
-        return false;
-    }
-    let mut cmd = binaries::silent_cmd(pandoc);
-    if let Some(fmt) = format_entree { cmd.arg("-f").arg(fmt.to_pandoc_arg()); }
-    cmd.arg(input.to_str().unwrap());
-    if let Some(fmt) = format_sortie { cmd.arg("-t").arg(fmt.to_pandoc_arg()); }
-    cmd.arg("-o").arg(output);
-    match cmd.output() {
-        Ok(out) => {
-            let success = out.status.success();
-            if !success {
-                let stderr = String::from_utf8_lossy(&out.stderr);
-                crate::log_error(&format!(
-                    "doc::convertir_avec_formats ÉCHEC | code={:?} | pandoc stderr={}",
-                    out.status.code(), stderr.trim()
-                ));
-            }
-            success
-        },
-        Err(e) => {
-            crate::log_error(&format!("doc::convertir_avec_formats impossible de lancer pandoc : {}", e));
-            false
-        }
-    }
-}
-
-pub fn convertir_csv(input: &Path, output: &str, fmt: FormatSortie) -> bool {
-    convertir_avec_formats(input, output, Some(FormatEntree::Csv), Some(fmt))
-}
-
-pub fn traiter_log(input: &Path, output: &str) -> bool {
-    binaries::silent_cmd(binaries::get_pandoc())
-        .arg(input.to_str().unwrap())
-        .arg("-f").arg("markdown").arg("-t").arg("plain")
-        .arg("-o").arg(output)
-        .status().map(|s| s.success()).unwrap_or(false)
-}
-
-pub fn convertir_yaml(input: &Path, output: &str, fmt: FormatSortie) -> bool {
-    convertir_avec_formats(input, output, Some(FormatEntree::Yaml), Some(fmt))
-}
-
-pub fn convertir_typst(input: &Path, output: &str, fmt: FormatSortie) -> bool {
-    convertir_avec_formats(input, output, Some(FormatEntree::Typst), Some(fmt))
-}
-
-pub fn convertir_pdf(input: &Path, output: &str, fmt: FormatSortie) -> bool {
-    convertir_avec_formats(input, output, Some(FormatEntree::Pdf), Some(fmt))
-}
-
-pub fn convertir_vers_pdf(input: &Path, format_entree: Option<FormatEntree>) -> Result<String, String> {
-    let output = input.with_extension("pdf");
-    let output_str = output.to_str().ok_or("Chemin de sortie invalide")?;
-    if convertir_avec_formats(input, output_str, format_entree, Some(FormatSortie::Pdf)) {
-        Ok(output_str.to_string())
-    } else {
-        Err("Conversion vers PDF échouée".into())
-    }
 }
 
 pub fn detecter_format_entree(path: &Path) -> Option<FormatEntree> {
@@ -196,6 +38,7 @@ pub fn detecter_format_entree(path: &Path) -> Option<FormatEntree> {
         "tex"  => Some(FormatEntree::Tex),
         "rst"  => Some(FormatEntree::Rst),
         "pdf"  => Some(FormatEntree::Pdf),
+        "txt" | "text" | "nfo" => Some(FormatEntree::Txt),
         _ => None,
     })
 }
@@ -214,7 +57,605 @@ pub fn detecter_format_sortie(output: &str) -> Option<FormatSortie> {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  HELPERS — Conversion non-PDF → PDF → traitement → reconversion
+//  LECTEURS DE FORMATS (Rust pur)
+// ════════════════════════════════════════════════════════════════════════
+
+/// Lit un fichier texte brut
+fn lire_texte(path: &Path) -> Result<String, String> {
+    std::fs::read_to_string(path)
+        .map_err(|e| format!("Erreur lecture {:?} : {}", path, e))
+}
+
+/// Markdown → HTML via pulldown-cmark
+fn md_vers_html(texte: &str) -> String {
+    let mut opts = pulldown_cmark::Options::empty();
+    opts.insert(pulldown_cmark::Options::ENABLE_TABLES);
+    opts.insert(pulldown_cmark::Options::ENABLE_STRIKETHROUGH);
+    opts.insert(pulldown_cmark::Options::ENABLE_TASKLISTS);
+    let parser = pulldown_cmark::Parser::new_ext(texte, opts);
+    let mut html = String::new();
+    pulldown_cmark::html::push_html(&mut html, parser);
+    html
+}
+
+/// HTML → Markdown via html2md
+fn html_vers_md(html: &str) -> String {
+    html2md::parse_html(html)
+}
+
+/// HTML → texte brut (strip des tags)
+fn html_vers_texte(html: &str) -> String {
+    let mut result = String::new();
+    let mut in_tag = false;
+    let mut last_was_block = false;
+    for ch in html.chars() {
+        match ch {
+            '<' => {
+                in_tag = true;
+            }
+            '>' => {
+                in_tag = false;
+            }
+            _ if !in_tag => {
+                last_was_block = false;
+                result.push(ch);
+            }
+            _ => {
+                // à l'intérieur d'un tag, on détecte les balises block pour ajouter des newlines
+                if !last_was_block && (ch == 'p' || ch == 'd' || ch == 'h' || ch == 'l' || ch == 'b') {
+                    // heuristique simple, pas parfait
+                }
+            }
+        }
+    }
+    // Décoder les entités HTML courantes
+    result.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&nbsp;", " ")
+}
+
+/// Texte brut → HTML (wrap dans pre/p)
+fn texte_vers_html(texte: &str) -> String {
+    let escaped = texte
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
+    let paragraphs: Vec<String> = escaped.split("\n\n")
+        .map(|p| format!("<p>{}</p>", p.replace('\n', "<br/>")))
+        .collect();
+    format!("<!DOCTYPE html>\n<html><body>\n{}\n</body></html>", paragraphs.join("\n"))
+}
+
+/// Extraire le texte d'un fichier DOCX (zip contenant word/document.xml)
+fn lire_docx_texte(path: &Path) -> Result<String, String> {
+    let file = std::fs::File::open(path)
+        .map_err(|e| format!("Erreur ouverture DOCX : {}", e))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| format!("Erreur lecture ZIP DOCX : {}", e))?;
+
+    let mut xml_content = String::new();
+    {
+        let mut doc_file = archive.by_name("word/document.xml")
+            .map_err(|e| format!("word/document.xml introuvable : {}", e))?;
+        doc_file.read_to_string(&mut xml_content)
+            .map_err(|e| format!("Erreur lecture XML : {}", e))?;
+    }
+
+    extraire_texte_xml(&xml_content, &["w:t"])
+}
+
+/// Extraire le texte d'un fichier ODT (zip contenant content.xml)
+fn lire_odt_texte(path: &Path) -> Result<String, String> {
+    let file = std::fs::File::open(path)
+        .map_err(|e| format!("Erreur ouverture ODT : {}", e))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| format!("Erreur lecture ZIP ODT : {}", e))?;
+
+    let mut xml_content = String::new();
+    {
+        let mut content_file = archive.by_name("content.xml")
+            .map_err(|e| format!("content.xml introuvable : {}", e))?;
+        content_file.read_to_string(&mut xml_content)
+            .map_err(|e| format!("Erreur lecture XML : {}", e))?;
+    }
+
+    extraire_texte_xml(&xml_content, &["text:p", "text:h", "text:span"])
+}
+
+/// Extraire le texte d'un XML en cherchant les balises spécifiées
+fn extraire_texte_xml(xml: &str, balises_texte: &[&str]) -> Result<String, String> {
+    use quick_xml::events::Event;
+    use quick_xml::reader::Reader;
+
+    let mut reader = Reader::from_str(xml);
+    let mut texte = String::new();
+    let mut dans_balise_texte = false;
+    let mut profondeur_para: u32 = 0;
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(ref e)) => {
+                let name_bytes = e.name().into_inner().to_vec();
+                let nom = std::str::from_utf8(&name_bytes).unwrap_or("");
+                if balises_texte.iter().any(|b| *b == nom) {
+                    dans_balise_texte = true;
+                }
+                // Détecter les paragraphes pour ajouter des sauts de ligne
+                if nom == "w:p" || nom == "text:p" || nom == "text:h" {
+                    profondeur_para += 1;
+                    if !texte.is_empty() && !texte.ends_with('\n') {
+                        texte.push('\n');
+                    }
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                let name_bytes = e.name().into_inner().to_vec();
+                let nom = std::str::from_utf8(&name_bytes).unwrap_or("");
+                if balises_texte.iter().any(|b| *b == nom) {
+                    dans_balise_texte = false;
+                }
+                if nom == "w:p" || nom == "text:p" || nom == "text:h" {
+                    profondeur_para = profondeur_para.saturating_sub(1);
+                    if !texte.ends_with('\n') {
+                        texte.push('\n');
+                    }
+                }
+            }
+            Ok(Event::Text(e)) => {
+                if dans_balise_texte || profondeur_para > 0 {
+                    let bytes = e.into_inner();
+                    let t = String::from_utf8_lossy(bytes.as_ref());
+                    texte.push_str(&t);
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(format!("Erreur parsing XML : {}", e)),
+            _ => {}
+        }
+    }
+
+    Ok(texte.trim().to_string())
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  GÉNÉRATEUR PDF (lopdf pur — polices builtin)
+// ════════════════════════════════════════════════════════════════════════
+
+/// Génère un PDF à partir de texte brut, avec retour à la ligne et pagination
+fn texte_vers_pdf(texte: &str, output: &str) -> Result<(), String> {
+    let mut doc = Document::with_version("1.5");
+
+    let font_id = doc.add_object(dictionary! {
+        "Type" => "Font",
+        "Subtype" => "Type1",
+        "BaseFont" => "Helvetica",
+        "Encoding" => "WinAnsiEncoding",
+    });
+
+    let font_bold_id = doc.add_object(dictionary! {
+        "Type" => "Font",
+        "Subtype" => "Type1",
+        "BaseFont" => "Helvetica-Bold",
+        "Encoding" => "WinAnsiEncoding",
+    });
+
+    // A4 dimensions en points
+    let page_w = 595.0_f64;
+    let page_h = 842.0_f64;
+    let marge_gauche = 50.0_f64;
+    let marge_droite = 50.0_f64;
+    let marge_haut = 50.0_f64;
+    let marge_bas = 50.0_f64;
+    let taille_police = 11.0_f64;
+    let interligne = taille_police * 1.4;
+    let largeur_utile = page_w - marge_gauche - marge_droite;
+    // Approximation : ~0.5 * taille_police par caractère en Helvetica
+    let chars_par_ligne = (largeur_utile / (taille_police * 0.5)) as usize;
+
+    let lignes = decouper_texte(texte, chars_par_ligne);
+    let lignes_par_page = ((page_h - marge_haut - marge_bas) / interligne) as usize;
+
+    let pages_contenu: Vec<Vec<&str>> = lignes.chunks(lignes_par_page)
+        .map(|c| c.iter().map(|s| s.as_str()).collect())
+        .collect();
+
+    if pages_contenu.is_empty() {
+        // Document vide : une page blanche
+        let content = Content { operations: vec![] };
+        let content_bytes = content.encode().map_err(|e| format!("Erreur encodage : {}", e))?;
+        let stream_id = doc.add_object(Stream::new(dictionary! {}, content_bytes));
+        let resources = dictionary! {
+            "Font" => dictionary! {
+                "F1" => Object::Reference(font_id),
+            },
+        };
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "MediaBox" => vec![0.into(), 0.into(), page_w.into(), page_h.into()],
+            "Resources" => resources,
+            "Contents" => Object::Reference(stream_id),
+        });
+        let pages_id = doc.add_object(dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![Object::Reference(page_id)],
+            "Count" => Object::Integer(1),
+        });
+        if let Ok(Object::Dictionary(dict)) = doc.get_object_mut(page_id) {
+            dict.set("Parent", Object::Reference(pages_id));
+        }
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => Object::Reference(pages_id),
+        });
+        doc.trailer.set("Root", catalog_id);
+        return sauvegarder(&mut doc, output);
+    }
+
+    let mut page_ids = Vec::new();
+    for page_lignes in &pages_contenu {
+        let mut ops = vec![
+            Operation::new("BT", vec![]),
+            Operation::new("Tf", vec!["F1".into(), taille_police.into()]),
+            Operation::new("TL", vec![interligne.into()]),
+            Operation::new("Td", vec![marge_gauche.into(), (page_h - marge_haut).into()]),
+        ];
+
+        for ligne in page_lignes {
+            // Encoder en WinAnsi (remplacer les caractères non supportés)
+            let encoded = encoder_winansi(ligne);
+            ops.push(Operation::new("Tj", vec![Object::string_literal(encoded)]));
+            ops.push(Operation::new("T*", vec![]));
+        }
+
+        ops.push(Operation::new("ET", vec![]));
+
+        let content = Content { operations: ops };
+        let content_bytes = content.encode().map_err(|e| format!("Erreur encodage : {}", e))?;
+        let stream_id = doc.add_object(Stream::new(dictionary! {}, content_bytes));
+
+        let resources = dictionary! {
+            "Font" => dictionary! {
+                "F1" => Object::Reference(font_id),
+                "F2" => Object::Reference(font_bold_id),
+            },
+        };
+
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "MediaBox" => vec![0.into(), 0.into(), page_w.into(), page_h.into()],
+            "Resources" => resources,
+            "Contents" => Object::Reference(stream_id),
+        });
+        page_ids.push(page_id);
+    }
+
+    let pages_id = doc.add_object(dictionary! {
+        "Type" => "Pages",
+        "Kids" => page_ids.iter().map(|id| Object::Reference(*id)).collect::<Vec<_>>(),
+        "Count" => Object::Integer(page_ids.len() as i64),
+    });
+
+    for &pid in &page_ids {
+        if let Ok(Object::Dictionary(dict)) = doc.get_object_mut(pid) {
+            dict.set("Parent", Object::Reference(pages_id));
+        }
+    }
+
+    let catalog_id = doc.add_object(dictionary! {
+        "Type" => "Catalog",
+        "Pages" => Object::Reference(pages_id),
+    });
+    doc.trailer.set("Root", catalog_id);
+    doc.compress();
+
+    sauvegarder(&mut doc, output)
+}
+
+/// Découpe le texte en lignes en respectant une largeur max en caractères
+fn decouper_texte(texte: &str, max_chars: usize) -> Vec<String> {
+    let mut lignes = Vec::new();
+    for ligne_brute in texte.lines() {
+        if ligne_brute.is_empty() {
+            lignes.push(String::new());
+            continue;
+        }
+        let mut restant = ligne_brute;
+        while !restant.is_empty() {
+            if restant.len() <= max_chars {
+                lignes.push(restant.to_string());
+                break;
+            }
+            // Chercher le dernier espace avant la limite
+            let point_coupe = restant[..max_chars]
+                .rfind(' ')
+                .unwrap_or(max_chars);
+            lignes.push(restant[..point_coupe].to_string());
+            restant = restant[point_coupe..].trim_start();
+        }
+    }
+    lignes
+}
+
+/// Encode une chaîne pour WinAnsi (PDF Type1 builtin)
+/// Remplace les caractères UTF-8 non supportés par '?'
+fn encoder_winansi(texte: &str) -> String {
+    texte.chars().map(|c| {
+        match c {
+            // ASCII standard
+            '\u{0020}'..='\u{007E}' => c,
+            // Caractères latins courants supportés par WinAnsi
+            'À' | 'Á' | 'Â' | 'Ã' | 'Ä' | 'Å' | 'Æ' | 'Ç' |
+            'È' | 'É' | 'Ê' | 'Ë' | 'Ì' | 'Í' | 'Î' | 'Ï' |
+            'Ð' | 'Ñ' | 'Ò' | 'Ó' | 'Ô' | 'Õ' | 'Ö' | 'Ø' |
+            'Ù' | 'Ú' | 'Û' | 'Ü' | 'Ý' | 'Þ' | 'ß' |
+            'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' | 'æ' | 'ç' |
+            'è' | 'é' | 'ê' | 'ë' | 'ì' | 'í' | 'î' | 'ï' |
+            'ð' | 'ñ' | 'ò' | 'ó' | 'ô' | 'õ' | 'ö' | 'ø' |
+            'ù' | 'ú' | 'û' | 'ü' | 'ý' | 'þ' | 'ÿ' |
+            '€' | '‚' | 'ƒ' | '„' | '…' | '†' | '‡' | 'ˆ' |
+            '‰' | 'Š' | '‹' | 'Œ' | 'Ž' | '\u{2018}' | '\u{2019}' | '\u{201C}' |
+            '\u{201D}' | '•' | '–' | '—' | '˜' | '™' | 'š' | '›' |
+            'œ' | 'ž' | 'Ÿ' | '×' | '÷' => c,
+            // Tab → espaces
+            '\t' => ' ',
+            // Tout le reste → ?
+            _ => '?',
+        }
+    }).collect()
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  CONVERSION PRINCIPALE (Rust pur — sans pandoc)
+// ════════════════════════════════════════════════════════════════════════
+
+/// Conversion générale : détecte les formats d'entrée/sortie et convertit
+pub fn convertir(input: &Path, output: &str) -> bool {
+    crate::log_info(&format!("doc::convertir | {:?} -> {}", input, output));
+
+    let fmt_in = detecter_format_entree(input);
+    let fmt_out = detecter_format_sortie(output);
+
+    let result = match (fmt_in, fmt_out) {
+        // ── Vers PDF ──
+        (Some(FormatEntree::Md), Some(FormatSortie::Pdf)) => {
+            lire_texte(input).and_then(|t| {
+                let html = md_vers_html(&t);
+                let texte = html_vers_texte(&html);
+                texte_vers_pdf(&texte, output)
+            })
+        }
+        (Some(FormatEntree::Html), Some(FormatSortie::Pdf)) => {
+            lire_texte(input).and_then(|html| {
+                let texte = html_vers_texte(&html);
+                texte_vers_pdf(&texte, output)
+            })
+        }
+        (Some(FormatEntree::Txt) | Some(FormatEntree::Log) | Some(FormatEntree::Csv) |
+         Some(FormatEntree::Json) | Some(FormatEntree::Yaml), Some(FormatSortie::Pdf)) => {
+            lire_texte(input).and_then(|t| texte_vers_pdf(&t, output))
+        }
+        (Some(FormatEntree::Docx) | Some(FormatEntree::Dotx), Some(FormatSortie::Pdf)) => {
+            lire_docx_texte(input).and_then(|t| texte_vers_pdf(&t, output))
+        }
+        (Some(FormatEntree::Odt), Some(FormatSortie::Pdf)) => {
+            lire_odt_texte(input).and_then(|t| texte_vers_pdf(&t, output))
+        }
+
+        // ── Vers HTML ──
+        (Some(FormatEntree::Md), Some(FormatSortie::Html)) => {
+            lire_texte(input).map(|t| {
+                let html = md_vers_html(&t);
+                let full = format!("<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"></head><body>\n{}\n</body></html>", html);
+                std::fs::write(output, full)
+                    .map_err(|e| format!("Erreur écriture : {}", e))
+            }).and_then(|r| r)
+        }
+        (Some(FormatEntree::Txt) | Some(FormatEntree::Log) | Some(FormatEntree::Csv) |
+         Some(FormatEntree::Json) | Some(FormatEntree::Yaml), Some(FormatSortie::Html)) => {
+            lire_texte(input).and_then(|t| {
+                let html = texte_vers_html(&t);
+                std::fs::write(output, html).map_err(|e| format!("Erreur écriture : {}", e))
+            })
+        }
+        (Some(FormatEntree::Docx) | Some(FormatEntree::Dotx), Some(FormatSortie::Html)) => {
+            lire_docx_texte(input).and_then(|t| {
+                let html = texte_vers_html(&t);
+                std::fs::write(output, html).map_err(|e| format!("Erreur écriture : {}", e))
+            })
+        }
+        (Some(FormatEntree::Odt), Some(FormatSortie::Html)) => {
+            lire_odt_texte(input).and_then(|t| {
+                let html = texte_vers_html(&t);
+                std::fs::write(output, html).map_err(|e| format!("Erreur écriture : {}", e))
+            })
+        }
+
+        // ── Vers Markdown ──
+        (Some(FormatEntree::Html), Some(FormatSortie::Md)) => {
+            lire_texte(input).and_then(|html| {
+                let md = html_vers_md(&html);
+                std::fs::write(output, md).map_err(|e| format!("Erreur écriture : {}", e))
+            })
+        }
+        (Some(FormatEntree::Docx) | Some(FormatEntree::Dotx), Some(FormatSortie::Md)) => {
+            lire_docx_texte(input).and_then(|t| {
+                std::fs::write(output, t).map_err(|e| format!("Erreur écriture : {}", e))
+            })
+        }
+
+        // ── Vers texte brut ──
+        (Some(FormatEntree::Html), Some(FormatSortie::Plain)) => {
+            lire_texte(input).and_then(|html| {
+                let texte = html_vers_texte(&html);
+                std::fs::write(output, texte).map_err(|e| format!("Erreur écriture : {}", e))
+            })
+        }
+        (Some(FormatEntree::Md), Some(FormatSortie::Plain)) => {
+            lire_texte(input).and_then(|md| {
+                let html = md_vers_html(&md);
+                let texte = html_vers_texte(&html);
+                std::fs::write(output, texte).map_err(|e| format!("Erreur écriture : {}", e))
+            })
+        }
+        (Some(FormatEntree::Docx) | Some(FormatEntree::Dotx), Some(FormatSortie::Plain)) => {
+            lire_docx_texte(input).and_then(|t| {
+                std::fs::write(output, t).map_err(|e| format!("Erreur écriture : {}", e))
+            })
+        }
+        (Some(FormatEntree::Odt), Some(FormatSortie::Plain)) => {
+            lire_odt_texte(input).and_then(|t| {
+                std::fs::write(output, t).map_err(|e| format!("Erreur écriture : {}", e))
+            })
+        }
+
+        // ── Vers DOCX (basique : texte dans un docx minimal) ──
+        (_, Some(FormatSortie::Docx)) => {
+            let texte = match fmt_in {
+                Some(FormatEntree::Md) => lire_texte(input).map(|t| { let h = md_vers_html(&t); html_vers_texte(&h) }),
+                Some(FormatEntree::Html) => lire_texte(input).map(|h| html_vers_texte(&h)),
+                Some(FormatEntree::Docx) | Some(FormatEntree::Dotx) => lire_docx_texte(input),
+                Some(FormatEntree::Odt) => lire_odt_texte(input),
+                _ => lire_texte(input),
+            };
+            texte.and_then(|t| ecrire_docx_simple(&t, output))
+        }
+
+        // ── Copie directe si même format ou inconnu ──
+        _ => {
+            crate::log_warn(&format!("doc::convertir | conversion non supportée {:?} -> {:?}, copie directe", fmt_in, fmt_out));
+            std::fs::copy(input, output)
+                .map(|_| ())
+                .map_err(|e| format!("Erreur copie : {}", e))
+        }
+    };
+
+    match result {
+        Ok(()) => {
+            crate::log_info(&format!("doc::convertir OK | {:?} -> {}", input, output));
+            true
+        }
+        Err(e) => {
+            crate::log_error(&format!("doc::convertir ÉCHEC | {}", e));
+            false
+        }
+    }
+}
+
+/// Conversion avec formats explicites
+pub fn convertir_avec_formats(
+    input: &Path, output: &str,
+    _format_entree: Option<FormatEntree>,
+    _format_sortie: Option<FormatSortie>,
+) -> bool {
+    // Délègue à convertir() qui détecte les formats par extension
+    convertir(input, output)
+}
+
+/// Extraire le texte brut d'un document
+pub fn extraire_texte(input: &Path, output: &str) -> bool {
+    let result = match detecter_format_entree(input) {
+        Some(FormatEntree::Docx) | Some(FormatEntree::Dotx) => lire_docx_texte(input),
+        Some(FormatEntree::Odt) => lire_odt_texte(input),
+        Some(FormatEntree::Html) => lire_texte(input).map(|h| html_vers_texte(&h)),
+        Some(FormatEntree::Md) => lire_texte(input).map(|t| {
+            let html = md_vers_html(&t);
+            html_vers_texte(&html)
+        }),
+        _ => lire_texte(input),
+    };
+    match result {
+        Ok(texte) => {
+            std::fs::write(output, texte).is_ok()
+        }
+        Err(e) => {
+            crate::log_error(&format!("doc::extraire_texte ÉCHEC | {}", e));
+            false
+        }
+    }
+}
+
+/// Écrire un DOCX minimal (un seul paragraphe de texte)
+fn ecrire_docx_simple(texte: &str, output: &str) -> Result<(), String> {
+    use std::io::Write;
+    let file = std::fs::File::create(output)
+        .map_err(|e| format!("Erreur création DOCX : {}", e))?;
+    let mut zip_writer = zip::ZipWriter::new(file);
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+
+    // [Content_Types].xml
+    zip_writer.start_file("[Content_Types].xml", options)
+        .map_err(|e| format!("Erreur ZIP : {}", e))?;
+    zip_writer.write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>"#).map_err(|e| format!("Erreur écriture : {}", e))?;
+
+    // _rels/.rels
+    zip_writer.start_file("_rels/.rels", options)
+        .map_err(|e| format!("Erreur ZIP : {}", e))?;
+    zip_writer.write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#).map_err(|e| format!("Erreur écriture : {}", e))?;
+
+    // word/_rels/document.xml.rels
+    zip_writer.start_file("word/_rels/document.xml.rels", options)
+        .map_err(|e| format!("Erreur ZIP : {}", e))?;
+    zip_writer.write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>"#).map_err(|e| format!("Erreur écriture : {}", e))?;
+
+    // word/document.xml
+    zip_writer.start_file("word/document.xml", options)
+        .map_err(|e| format!("Erreur ZIP : {}", e))?;
+
+    let mut doc_xml = String::from(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>"#);
+
+    for ligne in texte.lines() {
+        let escaped = ligne
+            .replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;");
+        doc_xml.push_str(&format!("\n    <w:p><w:r><w:t xml:space=\"preserve\">{}</w:t></w:r></w:p>", escaped));
+    }
+
+    doc_xml.push_str("\n  </w:body>\n</w:document>");
+
+    zip_writer.write_all(doc_xml.as_bytes())
+        .map_err(|e| format!("Erreur écriture : {}", e))?;
+
+    zip_writer.finish()
+        .map_err(|e| format!("Erreur finalisation ZIP : {}", e))?;
+
+    Ok(())
+}
+
+// Fonctions de compatibilité (dead code mais gardées pour l'API)
+pub fn convertir_csv(input: &Path, output: &str, _fmt: FormatSortie) -> bool { convertir(input, output) }
+pub fn traiter_log(input: &Path, output: &str) -> bool { convertir(input, output) }
+pub fn convertir_yaml(input: &Path, output: &str, _fmt: FormatSortie) -> bool { convertir(input, output) }
+pub fn convertir_typst(input: &Path, output: &str, _fmt: FormatSortie) -> bool { convertir(input, output) }
+pub fn convertir_pdf(input: &Path, output: &str, _fmt: FormatSortie) -> bool { convertir(input, output) }
+pub fn convertir_vers_pdf(input: &Path, _format_entree: Option<FormatEntree>) -> Result<String, String> {
+    let output = input.with_extension("pdf");
+    let output_str = output.to_str().ok_or("Chemin de sortie invalide")?;
+    if convertir(input, output_str) {
+        Ok(output_str.to_string())
+    } else {
+        Err("Conversion vers PDF échouée".into())
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  HELPERS — conversion intermédiaire pour opérations PDF
 // ════════════════════════════════════════════════════════════════════════
 
 fn est_pdf(path: &Path) -> bool {
@@ -224,47 +665,40 @@ fn est_pdf(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Convertit un fichier non-PDF en PDF temporaire via pandoc.
-/// Retourne le chemin du fichier PDF temporaire.
+/// Convertit un fichier non-PDF en PDF temporaire (Rust pur)
 fn vers_pdf_temp(input: &Path) -> Result<String, String> {
     let tmp = std::env::temp_dir().join(format!(
         "oxyon_tmp_{}.pdf",
         input.file_stem().unwrap_or_default().to_string_lossy()
     ));
     let tmp_str = tmp.to_str().ok_or("Chemin temp invalide")?;
-    let format_in = detecter_format_entree(input);
-    crate::log_info(&format!("vers_pdf_temp | {:?} -> {} | format_in={:?}", input, tmp_str, format_in));
-    if convertir_avec_formats(input, tmp_str, format_in, Some(FormatSortie::Pdf)) {
+    crate::log_info(&format!("vers_pdf_temp | {:?} -> {}", input, tmp_str));
+    if convertir(input, tmp_str) {
         Ok(tmp_str.to_string())
     } else {
         Err(format!("Conversion vers PDF temporaire échouée pour {}", input.display()))
     }
 }
 
-/// Reconvertit un PDF temporaire vers le format original du fichier.
+/// Reconvertit un PDF temporaire vers le format original
 fn depuis_pdf_temp(pdf_path: &str, output: &str) -> Result<(), String> {
     let fmt_out = detecter_format_sortie(output);
     if fmt_out.is_none() || matches!(fmt_out, Some(FormatSortie::Pdf)) {
-        // Déjà PDF ou format inconnu : simple copie
         std::fs::copy(pdf_path, output)
             .map_err(|e| format!("Erreur copie {} → {} : {}", pdf_path, output, e))?;
         return Ok(());
     }
-    if convertir_avec_formats(Path::new(pdf_path), output, Some(FormatEntree::Pdf), fmt_out) {
+    if convertir(Path::new(pdf_path), output) {
         Ok(())
     } else {
         Err(format!("Reconversion depuis PDF échouée pour {}", output))
     }
 }
 
-/// Nettoie un fichier temporaire (ignore les erreurs)
 fn nettoyer_temp(path: &str) {
     let _ = std::fs::remove_file(path);
 }
 
-/// Applique une opération PDF sur n'importe quel format compatible.
-/// Pour les fichiers non-PDF, convertit d'abord en PDF, applique l'opération, puis reconvertit.
-/// `op_pdf` reçoit (input_pdf, output_pdf) et fait le travail sur un vrai PDF.
 fn appliquer_operation_doc<F>(input: &Path, output: &str, op_pdf: F) -> Result<(), String>
 where
     F: FnOnce(&Path, &str) -> Result<(), String>,
@@ -273,20 +707,15 @@ where
         crate::log_info(&format!("appliquer_operation_doc | PDF direct | {:?} -> {}", input, output));
         return op_pdf(input, output);
     }
-
-    // Entrée non-PDF : conversion → traitement → reconversion
     crate::log_info(&format!("appliquer_operation_doc | non-PDF, conversion intermédiaire | {:?}", input));
     let pdf_in = vers_pdf_temp(input)?;
     let pdf_out = format!("{}_out.pdf", pdf_in.trim_end_matches(".pdf"));
-
     let result = op_pdf(Path::new(&pdf_in), &pdf_out);
     nettoyer_temp(&pdf_in);
-
     if result.is_err() {
         nettoyer_temp(&pdf_out);
         return result;
     }
-
     let reconvert = depuis_pdf_temp(&pdf_out, output);
     nettoyer_temp(&pdf_out);
     reconvert
