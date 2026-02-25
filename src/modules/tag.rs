@@ -102,12 +102,13 @@ pub fn appliquer_tags(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
             tags.insert("RELEASETIME".to_string(), year);
         }
     }
-    // premiered → RELEASE_DATE (renommage)
+    // premiered → DATE_RELEASED (année seulement)
     if let Some(premiered) = tags.remove("premiered") {
-        if !premiered.is_empty() {
-            tags.insert("RELEASE_DATE".to_string(), premiered);
-        }
+    if !premiered.is_empty() {
+        let annee = premiered.split('-').next().unwrap_or(&premiered).to_string();
+        tags.insert("DATE_RELEASED".to_string(), annee);
     }
+}
     let xml_content = creer_xml_tags(&tags);
     let temp_xml = "temp_meta.xml";
     std::fs::write(temp_xml, xml_content).map_err(|e| e.to_string())?;
