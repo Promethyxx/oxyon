@@ -21,3 +21,4 @@ key.envbin/
 bin/
 target/
 .env
+config.toml
