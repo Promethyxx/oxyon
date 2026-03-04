@@ -142,12 +142,12 @@ impl Default for OxyonApp {
                 ratio_img: 2,
                 #[cfg(feature = "api")]
                 results_ui: Arc::new(Mutex::new(Vec::new())),
-                status: Arc::new(Mutex::new("Déposez des fichiers".into())),
+                status: Arc::new(Mutex::new("Drop files here".into())),
                 deps_manquantes: Vec::new(),
                 #[cfg(feature = "api")]
-                audio_action: "convert".into(),
+                audio_action: "Convert".into(),
                 #[cfg(feature = "api")]
-                audio_formats_dispo: vec!["mp3","aac","flac","ogg","opus","wav","m4a"].into_iter().map(String::from).collect(),
+                audio_formats_dispo: vec!["aac","flac","m4a","mp3","ogg","opus","wav"].into_iter().map(String::from).collect(),
                 #[cfg(feature = "api")]
                 tag_edit_val: String::new(),
                 current_theme: "Dark".into(),
@@ -167,7 +167,7 @@ impl Default for OxyonApp {
                 save_video_format: false,
                 #[cfg(feature = "api")]
                 video_speed: 4,
-                image_action: "convert".into(),
+                image_action: "Convert".into(),
                 rotation_angle: 90,
                 crop_x: 0,
                 crop_y: 0,
@@ -176,7 +176,7 @@ impl Default for OxyonApp {
                 resize_width: String::new(),
                 resize_height: String::new(),
                 resize_max_kb: String::new(),
-                doc_action: "convert".into(),
+                doc_action: "Convert".into(),
                 pdf_rotation_angle: 90,
                 pdf_pages_spec: "1-end".into(),
                 pdf_crop_x: 0.0,
@@ -411,7 +411,7 @@ impl OxyonApp {
         queue.clear();
         queue.extend(self.current_files.clone());
         drop(queue);
-        *self.status.lock().unwrap() = format!("🚀 Démarrage de {} tâches...", self.current_files.len());
+        *self.status.lock().unwrap() = format!("🚀 Starting {} tasks...", self.current_files.len());
         for _ in 0..self.max_parallel_jobs.min(self.current_files.len()) {
             self.spawn_worker(ctx.clone());
         }
@@ -475,7 +475,7 @@ impl OxyonApp {
                     None => break,
                 };
                 *active.lock().unwrap() += 1;
-                let effective_fmt = if module == ModuleType::Doc && doc_action != "convert" {
+                let effective_fmt = if module == ModuleType::Doc && doc_action != "Convert" {
                     "pdf".to_string()
                 } else {
                     fmt.clone()
@@ -496,7 +496,7 @@ impl OxyonApp {
 
                 let current = *completed.lock().unwrap() + *active.lock().unwrap();
                 let total_count = *total.lock().unwrap();
-                *status_arc.lock().unwrap() = format!("⚙️ Traitement {}/{} fichiers...", current, total_count);
+                *status_arc.lock().unwrap() = format!("⚙️ Processing {}/{} files...", current, total_count);
                 ctx.request_repaint();
 
                 // ── Exécution avec résultat détaillé ────────────────────
@@ -507,7 +507,7 @@ impl OxyonApp {
                         if modules::archive::compresser(&input, &out_str, &fmt, archive_niveau) {
                             Ok(())
                         } else {
-                            Err(format!("compresser() a retourné false | fmt={} | fichier={:?}", fmt, input))
+                            Err(format!("compresser() returned false | fmt={} | file={:?}", fmt, input))
                         }
                     },
                     #[cfg(feature = "api")]
@@ -526,7 +526,7 @@ impl OxyonApp {
                                     Ok(mut child) => {
                                         match child.wait() {
                                             Ok(status) if status.success() => Ok(()),
-                                            Ok(status) => Err(format!("process extraction audio terminé avec code={:?}", status.code())),
+                                            Ok(status) => Err(format!("audio extraction process exited with code={:?}", status.code())),
                                             Err(e) => Err(format!("erreur wait() extraction audio: {}", e)),
                                         }
                                     },
@@ -539,7 +539,7 @@ impl OxyonApp {
                                     Ok(mut child) => {
                                         match child.wait() {
                                             Ok(status) if status.success() => Ok(()),
-                                            Ok(status) => Err(format!("process audio terminé avec code={:?}", status.code())),
+                                            Ok(status) => Err(format!("audio process exited with code={:?}", status.code())),
                                             Err(e) => Err(format!("erreur wait() audio: {}", e)),
                                         }
                                     },
@@ -555,24 +555,24 @@ impl OxyonApp {
                             Ok(mut child) => {
                                 match child.wait() {
                                     Ok(status) if status.success() => Ok(()),
-                                    Ok(status) => Err(format!("process vidéo terminé avec code={:?}", status.code())),
-                                    Err(e) => Err(format!("erreur wait() vidéo: {}", e)),
+                                    Ok(status) => Err(format!("video process exited with code={:?}", status.code())),
+                                    Err(e) => Err(format!("wait() error video: {}", e)),
                                 }
                             },
-                            Err(e) => Err(format!("impossible de lancer ffmpeg vidéo: {}", e)),
+                            Err(e) => Err(format!("failed to start ffmpeg video: {}", e)),
                         }
                     },
                     ModuleType::Doc => {
                         log_info(&format!("Doc: action={} | {:?}", doc_action, input));
                         match doc_action.as_str() {
-                            "convert" => {
+                            "Convert" => {
                                 let format_entree = modules::doc::detecter_format_entree(&input);
                                 let format_sortie = modules::doc::detecter_format_sortie(&out_str);
-                                log_info(&format!("Doc convert: entree={:?} sortie={:?}", format_entree, format_sortie));
+                                log_info(&format!("Doc Convert: entree={:?} sortie={:?}", format_entree, format_sortie));
                                 if modules::doc::convertir_avec_formats(&input, &out_str, format_entree, format_sortie) {
                                     Ok(())
                                 } else {
-                                    Err(format!("convertir_avec_formats échoué | entree={:?} sortie={:?} | fichier={:?}", format_entree, format_sortie, input))
+                                    Err(format!("Convert_avec_formats failed | input={:?} output={:?} | file={:?}", format_entree, format_sortie, input))
                                 }
                             },
                             "pdf_split" => {
@@ -584,32 +584,32 @@ impl OxyonApp {
                                 log_info(&format!("Doc pdf_split: output_dir={:?}", output_dir));
                                 modules::doc::pdf_split(&input, output_dir.to_str().unwrap())
                                     .map(|_| ())
-                                    .map_err(|e| format!("pdf_split échoué: {}", e))
+                                    .map_err(|e| format!("pdf_split failed: {}", e))
                             },
                             "pdf_merge" => {
                                 let paths: Vec<&Path> = pdf_merge_list.iter().map(|p| p.as_path()).collect();
                                 let output_merge = input.parent().unwrap().join("merged_oxyon.pdf");
                                 log_info(&format!("Doc pdf_merge: {} fichiers -> {:?}", paths.len(), output_merge));
                                 modules::doc::pdf_merge(&paths, output_merge.to_str().unwrap())
-                                    .map_err(|e| format!("pdf_merge échoué: {}", e))
+                                    .map_err(|e| format!("pdf_merge failed: {}", e))
                             },
                             "pdf_rotate" => {
                                 let pages_opt = parse_pages_spec(&pdf_pages);
                                 log_info(&format!("Doc pdf_rotate: angle={} pages={:?}", pdf_angle, pages_opt));
                                 modules::doc::pdf_rotate(&input, &out_str, pdf_angle, pages_opt.as_deref())
-                                    .map_err(|e| format!("pdf_rotate échoué: {}", e))
+                                    .map_err(|e| format!("pdf_rotate failed: {}", e))
                             },
                             "pdf_compress" => {
                                 log_info(&format!("Doc pdf_compress: {:?}", input));
                                 modules::doc::pdf_compresser(&input, &out_str)
                                     .map(|_| ())
-                                    .map_err(|e| format!("pdf_compresser échoué: {}", e))
+                                    .map_err(|e| format!("pdf_compress failed: {}", e))
                             },
                             "pdf_crop" => {
                                 let pages_opt = parse_pages_spec(&pdf_pages);
                                 log_info(&format!("Doc pdf_crop: x={} y={} w={} h={} pages={:?}", pdf_crop_x, pdf_crop_y, pdf_crop_w, pdf_crop_h, pages_opt));
                                 modules::doc::pdf_crop(&input, &out_str, pdf_crop_x, pdf_crop_y, pdf_crop_w, pdf_crop_h, pages_opt.as_deref())
-                                    .map_err(|e| format!("pdf_crop échoué: {}", e))
+                                    .map_err(|e| format!("pdf_crop failed: {}", e))
                             },
                             "pdf_organize" => {
                                 let ordre: Vec<u32> = pdf_nouvel_ordre.split(',')
@@ -620,7 +620,7 @@ impl OxyonApp {
                                     Err("pdf_organize: ordre vide ou invalide".to_string())
                                 } else {
                                     modules::doc::pdf_organiser(&input, &out_str, &ordre)
-                                        .map_err(|e| format!("pdf_organiser échoué: {}", e))
+                                        .map_err(|e| format!("pdf_organize failed: {}", e))
                                 }
                             },
                             "pdf_delete_pages" => {
@@ -632,7 +632,7 @@ impl OxyonApp {
                                     Err("pdf_delete_pages: liste de pages vide ou invalide".to_string())
                                 } else {
                                     modules::doc::pdf_supprimer_pages(&input, &out_str, &pages_a_sup)
-                                        .map_err(|e| format!("pdf_supprimer_pages échoué: {}", e))
+                                        .map_err(|e| format!("pdf_delete_pages failed: {}", e))
                                 }
                             },
                             "pdf_numbers" => {
@@ -646,35 +646,35 @@ impl OxyonApp {
                                 };
                                 log_info(&format!("Doc pdf_numbers: debut={} position={} taille={}", pdf_num_debut, pdf_num_position, pdf_num_taille));
                                 modules::doc::pdf_numeroter(&input, &out_str, pdf_num_debut, position, pdf_num_taille)
-                                    .map_err(|e| format!("pdf_numeroter échoué: {}", e))
+                                    .map_err(|e| format!("pdf_number_pages failed: {}", e))
                             },
                             "pdf_protect" => {
                                 log_info(&format!("Doc pdf_protect: print={} copy={}", pdf_allow_print, pdf_allow_copy));
                                 modules::doc::pdf_proteger(&input, &out_str, &pdf_owner_pass, &pdf_user_pass, pdf_allow_print, pdf_allow_copy)
-                                    .map_err(|e| format!("pdf_proteger échoué: {}", e))
+                                    .map_err(|e| format!("pdf_protect failed: {}", e))
                             },
                             "pdf_unlock" => {
                                 log_info("Doc pdf_unlock");
                                 modules::doc::pdf_dechiffrer(&input, &out_str, &pdf_unlock_pass)
-                                    .map_err(|e| format!("pdf_dechiffrer échoué: {}", e))
+                                    .map_err(|e| format!("pdf_unlock failed: {}", e))
                             },
                             "pdf_repair" => {
                                 log_info(&format!("Doc pdf_repair: {:?}", input));
                                 modules::doc::pdf_reparer(&input, &out_str)
-                                    .map_err(|e| format!("pdf_reparer échoué: {}", e))
+                                    .map_err(|e| format!("pdf_repair failed: {}", e))
                             },
                             "pdf_watermark" => {
                                 let pages_opt = parse_pages_spec(&pdf_pages);
                                 log_info(&format!("Doc pdf_watermark: texte='{}' taille={} opacite={}", pdf_wm_texte, pdf_wm_taille, pdf_wm_opacite));
                                 modules::doc::pdf_watermark(&input, &out_str, &pdf_wm_texte, pdf_wm_taille, pdf_wm_opacite, pages_opt.as_deref())
-                                    .map_err(|e| format!("pdf_watermark échoué: {}", e))
+                                    .map_err(|e| format!("pdf_watermark failed: {}", e))
                             },
                             autre => {
-                                log_warn(&format!("Doc: action inconnue '{}', fallback convertir()", autre));
+                                log_warn(&format!("Doc: action inconnue '{}', fallback Convert()", autre));
                                 if modules::doc::convertir(&input, &out_str) {
                                     Ok(())
                                 } else {
-                                    Err(format!("convertir() fallback échoué pour {:?}", input))
+                                    Err(format!("Convert() fallback failed for {:?}", input))
                                 }
                             },
                         }
@@ -682,9 +682,9 @@ impl OxyonApp {
                     ModuleType::Image => {
                         log_info(&format!("Image: action={} fmt={} ratio={} | {:?}", img_action, fmt, ratio, input));
                         match img_action.as_str() {
-                            "convert" => {
+                            "Convert" => {
                                 if modules::pic::compresser(&input, &out_str, ratio) { Ok(()) }
-                                else { Err(format!("pic::compresser échoué | fmt={} ratio={} | {:?}", fmt, ratio, input)) }
+                                else { Err(format!("pic::compresser failed | fmt={} ratio={} | {:?}", fmt, ratio, input)) }
                             },
                             "resize" => {
                                 log_info(&format!("Image resize: w={} h={} kb={}", resize_w, resize_h, resize_kb));
@@ -695,38 +695,38 @@ impl OxyonApp {
                                             if modules::pic::redimensionner_poids(Path::new(&temp), &out_str, resize_kb) {
                                                 Ok(())
                                             } else {
-                                                Err(format!("resize poids échoué | max_kb={} | fichier={:?}", resize_kb, input))
+                                                Err(format!("resize by size failed | max_kb={} | file={:?}", resize_kb, input))
                                             }
                                         } else {
-                                            Err(format!("resize pixels échoué | w={} h={} | fichier={:?}", resize_w, resize_h, input))
+                                            Err(format!("resize by pixels failed | w={} h={} | file={:?}", resize_w, resize_h, input))
                                         }
                                     } else {
                                         if modules::pic::redimensionner_pixels(&input, &out_str, resize_w, resize_h) { Ok(()) }
-                                        else { Err(format!("resize pixels échoué | w={} h={} | fichier={:?}", resize_w, resize_h, input)) }
+                                        else { Err(format!("resize by pixels failed | w={} h={} | file={:?}", resize_w, resize_h, input)) }
                                     }
                                 } else if resize_kb > 0 {
                                     if modules::pic::redimensionner_poids(&input, &out_str, resize_kb) { Ok(()) }
-                                    else { Err(format!("resize poids seul échoué | max_kb={} | fichier={:?}", resize_kb, input)) }
+                                    else { Err(format!("resize by size only failed | max_kb={} | file={:?}", resize_kb, input)) }
                                 } else {
-                                    log_warn("Image resize: ni w/h ni kb spécifiés, fallback compresser");
+                                    log_warn("Image resize: no w/h or kb specified, fallback to compress");
                                     if modules::pic::compresser(&input, &out_str, 1) { Ok(()) }
-                                    else { Err(format!("pic::compresser fallback échoué pour {:?}", input)) }
+                                    else { Err(format!("pic::compresser fallback failed for {:?}", input)) }
                                 }
                             },
                             "rotate" => {
                                 log_info(&format!("Image rotate: angle={}", angle));
                                 if modules::pic::pivoter(&input, &out_str, angle) { Ok(()) }
-                                else { Err(format!("pic::pivoter échoué | angle={} | fichier={:?}", angle, input)) }
+                                else { Err(format!("pic::rotate failed | angle={} | file={:?}", angle, input)) }
                             },
                             "crop" => {
                                 log_info(&format!("Image crop: x={} y={} w={} h={}", crop_x, crop_y, crop_w, crop_h));
                                 if modules::pic::recadrer(&input, &out_str, crop_x, crop_y, crop_w, crop_h) { Ok(()) }
-                                else { Err(format!("pic::recadrer échoué | x={} y={} w={} h={} | fichier={:?}", crop_x, crop_y, crop_w, crop_h, input)) }
+                                else { Err(format!("pic::crop failed | x={} y={} w={} h={} | file={:?}", crop_x, crop_y, crop_w, crop_h, input)) }
                             },
                             autre => {
                                 log_warn(&format!("Image: action inconnue '{}', fallback compresser", autre));
                                 if modules::pic::compresser(&input, &out_str, ratio) { Ok(()) }
-                                else { Err(format!("pic::compresser fallback échoué pour {:?}", input)) }
+                                else { Err(format!("pic::compresser fallback failed for {:?}", input)) }
                             },
                         }
                     },
@@ -751,7 +751,7 @@ impl OxyonApp {
                     },
                     Err(raison) => {
                         log_error(&format!(
-                            "ÉCHEC ({:.2}s) | module={:?} | fichier={:?} | raison={}",
+                            "FAILED ({:.2}s) | module={:?} | file={:?} | reason={}",
                             elapsed.as_secs_f32(), module, input, raison
                         ));
                     }
@@ -762,10 +762,10 @@ impl OxyonApp {
                 let done = *completed.lock().unwrap();
                 let total_count = *total.lock().unwrap();
                 if done >= total_count {
-                    log_info(&format!("=== BATCH END | {}/{} fichiers traités ===", done, total_count));
-                    *status_arc.lock().unwrap() = format!("✅ Terminé : {}/{} fichiers", done, total_count);
+                    log_info(&format!("=== BATCH END | {}/{} files processed ===", done, total_count));
+                    *status_arc.lock().unwrap() = format!("✅ Done: {}/{} files", done, total_count);
                 } else {
-                    *status_arc.lock().unwrap() = format!("⚙️ Traitement {}/{} fichiers...", done, total_count);
+                    *status_arc.lock().unwrap() = format!("⚙️ Processing {}/{} files...", done, total_count);
                 }
                 ctx.request_repaint();
             }
@@ -787,12 +787,12 @@ impl eframe::App for OxyonApp {
                 }
                 #[cfg(feature = "api")]
                 self.results_ui.lock().unwrap().clear();
-                *self.status.lock().unwrap() = format!("📁 {} fichiers chargés", self.current_files.len());
+                *self.status.lock().unwrap() = format!("📁 {} files loaded", self.current_files.len());
             }
         });
         if let Some(ref mut c) = self.process {
             if let Ok(Some(_)) = c.try_wait() {
-                *self.status.lock().unwrap() = "✅ Terminé".into();
+                *self.status.lock().unwrap() = "✅ Done".into();
                 self.process = None;
             }
             ctx.request_repaint();
@@ -800,7 +800,7 @@ impl eframe::App for OxyonApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| ui.heading(format!("OXYON v{}", VERSION)));
             if !self.deps_manquantes.is_empty() {
-                ui.colored_label(egui::Color32::RED, format!("⚠️ Manquant : {}", self.deps_manquantes.join(", ")));
+                ui.colored_label(egui::Color32::RED, format!("⚠️ Missing: {}", self.deps_manquantes.join(", ")));
             }
             ui.separator();
             ui.horizontal_wrapped(|ui| {
@@ -811,8 +811,8 @@ impl eframe::App for OxyonApp {
                 mods.push((ModuleType::Image, "🖼️ Image"));
                 #[cfg(feature = "api")] mods.push((ModuleType::Scrapper, "🔍 Scrapper"));
                 #[cfg(feature = "api")] mods.push((ModuleType::Tag, "🏷️ Tag"));
-                #[cfg(feature = "api")] mods.push((ModuleType::Video, "🎬 Vidéo"));
-                mods.push((ModuleType::Settings, "⚙ Paramètres"));
+                #[cfg(feature = "api")] mods.push((ModuleType::Video, "🎬 Video"));
+                mods.push((ModuleType::Settings, "⚙ Settings"));
                 for (m, txt) in mods {
                     if ui.selectable_value(&mut self.module_actif, m, txt).clicked() {
                         self.load_config();
@@ -834,7 +834,7 @@ impl eframe::App for OxyonApp {
                     if ui.add(egui::Slider::new(&mut self.archive_niveau, 1..=9).text("Compression (1=fast, 9=quality")).changed() {
                         self.save_config();
                     }
-                    if ui.checkbox(&mut self.save_archive_format, "💾 Sauvegarder ce format").changed() {
+                    if ui.checkbox(&mut self.save_archive_format, "💾 Save format").changed() {
                         self.save_config();
                     }
                 },
@@ -842,24 +842,24 @@ impl eframe::App for OxyonApp {
                     ui.horizontal(|ui| {
                         ui.label("Action :");
                         egui::ComboBox::from_id_salt("doc_action").selected_text(&self.doc_action).show_ui(ui, |ui| {
-                            ui.selectable_value(&mut self.doc_action, "convert".into(), "Convertir");
-                            ui.selectable_value(&mut self.doc_action, "pdf_split".into(), "Diviser PDF");
-                            ui.selectable_value(&mut self.doc_action, "pdf_merge".into(), "Fusionner PDF");
-                            ui.selectable_value(&mut self.doc_action, "pdf_rotate".into(), "Rotation PDF");
-                            ui.selectable_value(&mut self.doc_action, "pdf_compress".into(), "Compresser PDF");
-                            ui.selectable_value(&mut self.doc_action, "pdf_crop".into(), "Rogner PDF");
-                            ui.selectable_value(&mut self.doc_action, "pdf_organize".into(), "Réorganiser pages");
-                            ui.selectable_value(&mut self.doc_action, "pdf_delete_pages".into(), "Supprimer pages");
-                            ui.selectable_value(&mut self.doc_action, "pdf_numbers".into(), "Numéroter pages");
-                            ui.selectable_value(&mut self.doc_action, "pdf_protect".into(), "Protéger PDF");
-                            ui.selectable_value(&mut self.doc_action, "pdf_unlock".into(), "Déchiffrer PDF");
-                            ui.selectable_value(&mut self.doc_action, "pdf_repair".into(), "Réparer PDF");
-                            ui.selectable_value(&mut self.doc_action, "pdf_watermark".into(), "Filigrane PDF");
+							ui.selectable_value(&mut self.doc_action, "Convert".into(), "Convert");
+                            ui.selectable_value(&mut self.doc_action, "pdf_compress".into(), "PDF compress");
+							ui.selectable_value(&mut self.doc_action, "pdf_crop".into(), "PDF crop");
+                            ui.selectable_value(&mut self.doc_action, "pdf_delete_pages".into(), "PDF delete pages");
+							ui.selectable_value(&mut self.doc_action, "pdf_merge".into(), "PDF merge");
+                            ui.selectable_value(&mut self.doc_action, "pdf_numbers".into(), "PDF Number pages");
+                            ui.selectable_value(&mut self.doc_action, "pdf_organize".into(), "PDF organize pages");
+							ui.selectable_value(&mut self.doc_action, "pdf_protect".into(), "PDF protect");
+                            ui.selectable_value(&mut self.doc_action, "pdf_repair".into(), "PDF repair");
+							ui.selectable_value(&mut self.doc_action, "pdf_rotate".into(), "PDF rotate");
+							ui.selectable_value(&mut self.doc_action, "pdf_split".into(), "PDF split");
+							ui.selectable_value(&mut self.doc_action, "pdf_unlock".into(), "PDF unlock");
+                            ui.selectable_value(&mut self.doc_action, "pdf_watermark".into(), "PDF watermark");
                         });
                     });
                     ui.separator();
                     match self.doc_action.as_str() {
-                        "convert" => {
+                        "Convert" => {
                             ui.horizontal(|ui| {
                                 ui.label("Format :");
                                 egui::ComboBox::from_id_salt("dfmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
@@ -868,17 +868,17 @@ impl eframe::App for OxyonApp {
                                     }
                                 });
                             });
-                            if ui.checkbox(&mut self.save_doc_format, "💾 Sauvegarder ce format").changed() {
+                            if ui.checkbox(&mut self.save_doc_format, "💾 Save format").changed() {
                                 self.save_config();
                             }
                         },
                         "pdf_split" => {
-                            ui.label("✂️ Divise chaque page du PDF en fichier séparé");
-                            ui.label("💡 Crée un dossier _pages/ à côté du fichier source");
+                            ui.label("✂️ Splits each PDF page into a separate file");
+                            ui.label("💡 Creates a _pages/ folder next to the source file");
                         },
                         "pdf_merge" => {
-                            ui.label("📎 Fusionne tous les fichiers chargés en un seul PDF");
-                            ui.label("💡 Le résultat sera merged_oxyon.pdf");
+                            ui.label("📎 Merges all loaded files into a single PDF");
+                            ui.label("💡 Output will be merged_oxyon.pdf");
                         },
                         "pdf_rotate" => {
                             ui.horizontal(|ui| {
@@ -895,10 +895,10 @@ impl eframe::App for OxyonApp {
                             });
                         },
                         "pdf_compress" => {
-                            ui.label("🗜️ Réduit la taille du PDF en recompressant");
+                            ui.label("🗜️ Reduces PDF size by recompressing");
                         },
                         "pdf_crop" => {
-                            ui.label("Marges en % (0.0 – 100.0) :");
+                            ui.label("Margins in % (0.0 - 100.0):");
                             ui.horizontal(|ui| {
                                 ui.label("X:");
                                 ui.add(egui::Slider::new(&mut self.pdf_crop_x, 0.0..=100.0).fixed_decimals(1));
@@ -918,16 +918,16 @@ impl eframe::App for OxyonApp {
                             });
                         },
                         "pdf_organize" => {
-                            ui.label("🔀 Nouvel ordre des pages (ex: 3,1,2) :");
+                            ui.label("🔀 New page order (e.g. 3,1,2):");
                             ui.text_edit_singleline(&mut self.pdf_nouvel_ordre);
                         },
                         "pdf_delete_pages" => {
-                            ui.label("🗑️ Pages à supprimer (ex: 2,4,6) :");
+                            ui.label("🗑️ Pages to delete (e.g. 2,4,6):");
                             ui.text_edit_singleline(&mut self.pdf_pages_spec);
                         },
                         "pdf_numbers" => {
                             ui.horizontal(|ui| {
-                                ui.label("Début :");
+                                ui.label("Start:");
                                 ui.add(egui::Slider::new(&mut self.pdf_num_debut, 1..=999));
                             });
                             ui.horizontal(|ui| {
@@ -945,30 +945,30 @@ impl eframe::App for OxyonApp {
                         },
                         "pdf_protect" => {
                             ui.horizontal(|ui| {
-                                ui.label("Mot de passe propriétaire :");
+                                ui.label("Owner password:");
                                 ui.add(egui::TextEdit::singleline(&mut self.pdf_owner_pass).password(true));
                             });
                             ui.horizontal(|ui| {
-                                ui.label("Mot de passe utilisateur :");
+                                ui.label("User password:");
                                 ui.add(egui::TextEdit::singleline(&mut self.pdf_user_pass).password(true));
                             });
-                            ui.checkbox(&mut self.pdf_allow_print, "Autoriser impression");
-                            ui.checkbox(&mut self.pdf_allow_copy, "Autoriser copie");
+                            ui.checkbox(&mut self.pdf_allow_print, "Allow printing");
+                            ui.checkbox(&mut self.pdf_allow_copy, "Allow copying");
                         },
                         "pdf_unlock" => {
                             ui.horizontal(|ui| {
-                                ui.label("Mot de passe :");
+                                ui.label("Password:");
                                 ui.add(egui::TextEdit::singleline(&mut self.pdf_unlock_pass).password(true));
                             });
                         },
                         "pdf_repair" => {
-                            ui.label("🔧 Tente de réparer un document corrompu");
-                            ui.label("Supprime les objets orphelins, recompresse, renumérate");
-                            ui.label("💡 Fonctionne sur tous les formats du module Doc");
+                            ui.label("🔧 Attempts to repair a corrupted document");
+                            ui.label("Removes orphan objects, recompresses, renumbers");
+                            ui.label("💡 Works on all Doc module formats");
                         },
                         "pdf_watermark" => {
-                            ui.label("💧 Ajoute un filigrane texte diagonal");
-                            ui.label("💡 Fonctionne sur tous les formats du module Doc");
+                            ui.label("💧 Adds a diagonal text watermark");
+                            ui.label("💡 Works on all Doc module formats");
                             ui.horizontal(|ui| {
                                 ui.label("Texte :");
                                 ui.text_edit_singleline(&mut self.pdf_wm_texte);
@@ -978,7 +978,7 @@ impl eframe::App for OxyonApp {
                                 ui.add(egui::Slider::new(&mut self.pdf_wm_taille, 12.0..=120.0).fixed_decimals(0));
                             });
                             ui.horizontal(|ui| {
-                                ui.label("Opacité :");
+                                ui.label("Opacity:");
                                 ui.add(egui::Slider::new(&mut self.pdf_wm_opacite, 0.05..=1.0).fixed_decimals(2));
                             });
                             ui.horizontal(|ui| {
@@ -994,15 +994,15 @@ impl eframe::App for OxyonApp {
                     ui.horizontal(|ui| {
                         ui.label("Action :");
                         egui::ComboBox::from_id_salt("img_action").selected_text(&self.image_action).show_ui(ui, |ui| {
-                            ui.selectable_value(&mut self.image_action, "convert".into(), "Convert");
+                            ui.selectable_value(&mut self.image_action, "Convert".into(), "Convert");
+							ui.selectable_value(&mut self.image_action, "crop".into(), "Crop");
                             ui.selectable_value(&mut self.image_action, "resize".into(), "Resize");
                             ui.selectable_value(&mut self.image_action, "rotate".into(), "Rotate");
-                            ui.selectable_value(&mut self.image_action, "crop".into(), "Crop");
                         });
                     });
                     ui.separator();
                     match self.image_action.as_str() {
-                        "convert" => {
+                        "Convert" => {
                             ui.horizontal(|ui| {
                                 ui.label("Format :");
                                 egui::ComboBox::from_id_salt("ifmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
@@ -1011,7 +1011,7 @@ impl eframe::App for OxyonApp {
                                     }
                                 });
                             });
-                            if ui.checkbox(&mut self.save_image_format, "💾 Sauvegarder ce format").changed() {
+                            if ui.checkbox(&mut self.save_image_format, "💾 Save format").changed() {
                                 self.save_config();
                             }
                             if ui.add(egui::Slider::new(&mut self.ratio_img, 1..=10).text("Quality (1=fast, 10=quality)")).changed() {
@@ -1027,7 +1027,7 @@ impl eframe::App for OxyonApp {
                                     }
                                 });
                             });
-                            if ui.checkbox(&mut self.save_image_format, "💾 Sauvegarder ce format").changed() {
+                            if ui.checkbox(&mut self.save_image_format, "💾 Save format").changed() {
                                 self.save_config();
                             }
                             ui.separator();
@@ -1055,7 +1055,7 @@ impl eframe::App for OxyonApp {
                             });
                         },
                         "crop" => {
-                            ui.label("Coordonnées en % (0-100) :");
+                            ui.label("Coordinates in % (0-100):");
                             ui.horizontal(|ui| {
                                 ui.label("X:");
                                 ui.add(egui::Slider::new(&mut self.crop_x, 0..=100));
@@ -1077,20 +1077,20 @@ impl eframe::App for OxyonApp {
                     ui.horizontal(|ui| {
                         ui.label("Action :");
                         egui::ComboBox::from_id_salt("audio_action").selected_text(&self.audio_action).show_ui(ui, |ui| {
-                            ui.selectable_value(&mut self.audio_action, "convert".into(), "Convertir");
-                            ui.selectable_value(&mut self.audio_action, "extract".into(), "Extraire audio");
+                            ui.selectable_value(&mut self.audio_action, "extract".into(), "Audio extract");
+							ui.selectable_value(&mut self.audio_action, "Convert".into(), "Convert");                            
                         });
                     });
                     ui.separator();
                     match self.audio_action.as_str() {
-                        "convert" => {
+                        "Convert" => {
                             // Détection codec au chargement de fichiers
                             if let Some(f) = self.current_files.first() {
-                                if ui.button("🔍 Détecter codec").clicked() {
+                                if ui.button("🔍 Detect codec").clicked() {
                                     let codec = modules::audio::detecter_extension(f);
                                     let fmts = modules::audio::formats_compatibles(&codec);
                                     self.audio_formats_dispo = fmts.iter().map(|s| s.to_string()).collect();
-                                    crate::log_info(&format!("Audio: codec détecté='{}' | formats compatibles={:?}", codec, self.audio_formats_dispo));
+                                    crate::log_info(&format!("Audio: codec detected='{}' | formats compatibles={:?}", codec, self.audio_formats_dispo));
                                 }
                             }
                             ui.horizontal(|ui| {
@@ -1104,13 +1104,13 @@ impl eframe::App for OxyonApp {
                             if ui.add(egui::Slider::new(&mut self.audio_qualite, 0..=9).text("VBR (1=fast, 9=quality)")).changed() {
                                 self.save_config();
                             }
-                            if ui.checkbox(&mut self.save_audio_format, "💾 Sauvegarder ce format").changed() {
+                            if ui.checkbox(&mut self.save_audio_format, "💾 Save format").changed() {
                                 self.save_config();
                             }
                         },
                         "extract" => {
-                            ui.label("🎵 Extrait la piste audio d'une vidéo (copie directe, sans réencodage)");
-                            ui.label("💡 Le format de sortie est détecté automatiquement");
+                            ui.label("🎵 Extracts audio from a video (direct copy, no re-encoding)");
+                            ui.label("💡 Output format is detected automatically");
                         },
                         _ => {}
                     }
@@ -1123,12 +1123,12 @@ impl eframe::App for OxyonApp {
                                 ui.selectable_value(&mut self.format_choisi, f.into(), f);
                             }
                         });
-                        if ui.checkbox(&mut self.copie_flux, "Copie flux").changed() { self.save_config(); }
+                        if ui.checkbox(&mut self.copie_flux, "Stream copy").changed() { self.save_config(); }
                     });
                     if ui.add(egui::Slider::new(&mut self.video_speed, 0..=8).text("Quality (1=fast, 8=quality)")).changed() {
                         self.save_config();
                     }
-                    if ui.checkbox(&mut self.save_video_format, "💾 Sauvegarder ce format").changed() {
+                    if ui.checkbox(&mut self.save_video_format, "💾 Save format").changed() {
                         self.save_config();
                     }
                 },
@@ -1142,7 +1142,7 @@ impl eframe::App for OxyonApp {
                         ui.label("Fanart API Key :");
                         ui.add(egui::TextEdit::singleline(&mut self.fanart_api_key).password(true));
                     });
-                    if ui.button("💾 Sauvegarder les clés").clicked() {
+                    if ui.button("💾 Save keys").clicked() {
                         let content = format!(
                             "TMDB_API_KEY={}\nFANART_API_KEY={}\n",
                             self.tmdb_api_key, self.fanart_api_key
@@ -1172,10 +1172,10 @@ impl eframe::App for OxyonApp {
                                 }
                             });
                         };
-                        if ui.button("🎬 Film").clicked() {
+                        if ui.button("🎬 Movie").clicked() {
                             search(false, Arc::clone(&self.results_ui), self.current_stem.clone(), ctx.clone());
                         }
-                        if ui.button("📺 Série").clicked() {
+                        if ui.button("📺 Series").clicked() {
                             search(true, Arc::clone(&self.results_ui), self.current_stem.clone(), ctx.clone());
                         }
                     });
@@ -1194,22 +1194,22 @@ impl eframe::App for OxyonApp {
                 ModuleType::Tag => {
                     let path_opt = self.current_files.get(0).cloned();
                     ui.vertical(|ui| {
-                        if ui.button("✅ Marquer VU").clicked() { if let Some(path) = &path_opt { let _ = modules::tag::marquer_vu(&path, &path.with_extension("nfo")); } }
-                        if ui.button("📥 Injecter tags depuis NFO").clicked() { if let Some(path) = &path_opt { let _ = modules::tag::appliquer_tags(&path, &path.with_extension("nfo")); } }
-                        if ui.button("🖼️ Ajouter poster / fanart").clicked() { if let Some(path) = &path_opt { let _ = modules::tag::ajouter_images_mkv(&path); } }
+                        if ui.button("✅ Mark as WATCHED").clicked() { if let Some(path) = &path_opt { let _ = modules::tag::marquer_vu(&path, &path.with_extension("nfo")); } }
+                        if ui.button("📥 Inject tags from NFO").clicked() { if let Some(path) = &path_opt { let _ = modules::tag::appliquer_tags(&path, &path.with_extension("nfo")); } }
+                        if ui.button("🖼️ Add poster / fanart").clicked() { if let Some(path) = &path_opt { let _ = modules::tag::ajouter_images_mkv(&path); } }
                         if ui.button("🗑️ Reset Tags").clicked() { if let Some(path) = &path_opt { let _ = modules::tag::supprimer_tous_tags(&path); } }
                         ui.horizontal(|ui| {
                             ui.text_edit_singleline(&mut self.tag_edit_val);
-                            if ui.button("✏️ Modifier Titre").clicked() { if let Some(path) = &path_opt { let _ = modules::tag::modifier_tag(&path, "title", &self.tag_edit_val); } }
+                            if ui.button("✏️ Edit Title").clicked() { if let Some(path) = &path_opt { let _ = modules::tag::modifier_tag(&path, "title", &self.tag_edit_val); } }
                         });
                     });
                 },
                 ModuleType::Settings => {
                     ui.vertical(|ui| {
-                        ui.heading("Paramètres");
+                        ui.heading("Settings");
                         let old_theme = self.current_theme.clone();
                         ui.horizontal(|ui| {
-                            ui.label("Thème :");
+                            ui.label("Theme:");
                             egui::ComboBox::from_id_salt("theme_sel").selected_text(&self.current_theme).show_ui(ui, |ui| {
                                 ui.selectable_value(&mut self.current_theme, "Auto".into(), "Auto");
                                 ui.selectable_value(&mut self.current_theme, "Light".into(), "Light");
@@ -1223,12 +1223,12 @@ impl eframe::App for OxyonApp {
                         ui.separator();
                         ui.heading("Performance");
                         ui.horizontal(|ui| {
-                            ui.label("Jobs parallèles max :");
+                            ui.label("Max parallel jobs:");
                             if ui.add(egui::Slider::new(&mut self.max_parallel_jobs, 1..=16).text("threads")).changed() {
                                 self.save_config();
                             }
                         });
-                        ui.label("💡 Plus = plus rapide mais plus de charge CPU");
+                        ui.label("💡 Higher = faster but more CPU load");
                     });
                 },
             }
@@ -1237,16 +1237,16 @@ impl eframe::App for OxyonApp {
             { hide_exec = hide_exec || self.module_actif == ModuleType::Scrapper || self.module_actif == ModuleType::Tag; }
             if !self.current_files.is_empty() && !hide_exec {
                 ui.separator();
-                if ui.button("🔥 EXÉCUTER TOUT").clicked() {
+                if ui.button("🔥 RUN ALL").clicked() {
                     self.lancer_batch(ctx.clone());
                 }
             }
             if self.current_files.is_empty() {
                 ui.centered_and_justified(|ui| {
                     ui.vertical_centered(|ui| {
-                        ui.label("📥 Glissez vos fichiers ici");
+                        ui.label("📥 Drop your files here");
                         ui.add_space(5.0);
-                        if ui.button("📂 Parcourir").clicked() {
+                        if ui.button("📂 Browse").clicked() {
                             if let Some(paths) = rfd::FileDialog::new().pick_files() {
                                 self.current_files = paths;
                                 if let Some(p) = self.current_files.first() {
@@ -1254,7 +1254,7 @@ impl eframe::App for OxyonApp {
                                 }
                                 #[cfg(feature = "api")]
                                 self.results_ui.lock().unwrap().clear();
-                                *self.status.lock().unwrap() = format!("📁 {} fichiers chargés", self.current_files.len());
+                                *self.status.lock().unwrap() = format!("📁 {} files loaded", self.current_files.len());
                             }
                         }
                     });
@@ -1267,16 +1267,16 @@ impl eframe::App for OxyonApp {
                 if total > 0 && completed < total {
                     let active = *self.active_jobs.lock().unwrap();
                     let pct = (completed as f32 / total as f32 * 100.0).round() as u32;
-                    ui.heading(format!("⚙️ {}/{} fichiers ({}%)", completed, total, pct));
+                    ui.heading(format!("⚙️ {}/{} files ({}%)", completed, total, pct));
                     ui.add(egui::ProgressBar::new(completed as f32 / total as f32).animate(true));
-                    ui.small(format!("{} actifs · {} en attente", active, self.job_queue.lock().unwrap().len()));
+                    ui.small(format!("{} active · {} pending", active, self.job_queue.lock().unwrap().len()));
                 } else if total > 0 && completed >= total {
-                    ui.heading(format!("✅ Terminé — {} fichiers traités", total));
+                    ui.heading(format!("✅ Done - {} files processed", total));
                 } else {
                     ui.heading(&*self.status.lock().unwrap());
                 }
             });
-            if !self.current_files.is_empty() { if ui.button("🗑️ Tout effacer").clicked() { self.current_files.clear(); } }
+            if !self.current_files.is_empty() { if ui.button("🗑️ Clear all").clicked() { self.current_files.clear(); } }
         });
     }
 }
@@ -1291,7 +1291,7 @@ fn parse_pages_spec(spec: &str) -> Option<Vec<u32>> {
     if pages.is_empty() { None } else { Some(pages) }
 }
 fn main() -> eframe::Result {
-    log_info(&format!("=== OXYON v{} DÉMARRAGE ===", VERSION));
+    log_info(&format!("=== OXYON v{} START ===", VERSION));
     let _ = modules::binaries::extraire_deps();
     let mut options = eframe::NativeOptions::default();
     #[cfg(target_os = "windows")]
