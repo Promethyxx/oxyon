@@ -7,12 +7,13 @@ use std::path::Path;
 //  ZIP — via crate `zip`
 // ════════════════════════════════════════════════════════════════════════
 
-fn compresser_zip(input: &Path, output: &str) -> Result<(), String> {
+fn compresser_zip(input: &Path, output: &str, niveau: u32) -> Result<(), String> {
     let file = fs::File::create(output)
         .map_err(|e| format!("Erreur creation zip : {}", e))?;
     let mut zip_writer = zip::ZipWriter::new(file);
     let options = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated);
+        .compression_method(zip::CompressionMethod::Deflated)
+        .compression_level(Some(niveau as i64));
 
     if input.is_dir() {
         ajouter_dossier_zip(&mut zip_writer, input, input, options)?;
@@ -67,7 +68,7 @@ fn extraire_zip(input: &Path, destination: &str) -> Result<(), String> {
 //  7Z — via crate `sevenz-rust2`
 // ════════════════════════════════════════════════════════════════════════
 
-fn compresser_7z(input: &Path, output: &str) -> Result<(), String> {
+fn compresser_7z(input: &Path, output: &str, _niveau: u32) -> Result<(), String> {
     sevenz_rust2::compress_to_path(input, output)
         .map_err(|e| format!("Erreur compression 7z : {}", e))
 }
@@ -81,10 +82,10 @@ fn extraire_7z(input: &Path, destination: &str) -> Result<(), String> {
 //  TAR.GZ — via crates `tar` + `flate2`
 // ════════════════════════════════════════════════════════════════════════
 
-fn compresser_tar(input: &Path, output: &str) -> Result<(), String> {
+fn compresser_tar(input: &Path, output: &str, niveau: u32) -> Result<(), String> {
     let file = fs::File::create(output)
         .map_err(|e| format!("Erreur creation tar.gz : {}", e))?;
-    let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::default());
+    let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::new(niveau));
     let mut archive = tar::Builder::new(encoder);
 
     if input.is_dir() {
@@ -116,10 +117,10 @@ fn extraire_tar(input: &Path, destination: &str) -> Result<(), String> {
 // ════════════════════════════════════════════════════════════════════════
 
 /// Compression : cree une archive (7z, zip, tar)
-pub fn compresser(input: &Path, output: &str, format_archive: &str) -> bool {
+pub fn compresser(input: &Path, output: &str, format_archive: &str, niveau: u32) -> bool {
     crate::log_info(&format!(
-        "archive::compresser | format={} | {:?} -> {} | est_dossier={}",
-        format_archive, input, output, input.is_dir()
+        "archive::compresser | format={} | niveau={} | {:?} -> {} | est_dossier={}",
+        format_archive, niveau, input, output, input.is_dir()
     ));
     if input.is_dir() {
         // Compter les fichiers pour anticiper la durée
@@ -130,9 +131,9 @@ pub fn compresser(input: &Path, output: &str, format_archive: &str) -> bool {
         crate::log_info(&format!("archive::compresser | fichier taille={} octets ({:.1} Mo)", taille, taille as f64 / 1_048_576.0));
     }
     let result = match format_archive.to_lowercase().as_str() {
-        "zip" => compresser_zip(input, output),
-        "7z"  => compresser_7z(input, output),
-        "tar" | "tar.gz" | "tgz" => compresser_tar(input, output),
+        "zip" => compresser_zip(input, output, niveau),
+        "7z"  => compresser_7z(input, output, niveau),
+        "tar" | "tar.gz" | "tgz" => compresser_tar(input, output, niveau),
         _ => Err(format!("Format d'archive non supporte : {}", format_archive)),
     };
     match &result {
@@ -192,7 +193,7 @@ pub fn convertir(input: &Path, format_cible: &str) -> bool {
     // 2. Recompresser
     let nom_base = input.file_stem().unwrap_or_default().to_string_lossy();
     let sortie = format!("{}.{}", nom_base, format_cible);
-    let success = compresser(&temp_dir, &sortie, format_cible);
+    let success = compresser(&temp_dir, &sortie, format_cible, 6);
     // 3. Nettoyer
     let _ = fs::remove_dir_all(&temp_dir);
     success

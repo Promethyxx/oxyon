@@ -3,20 +3,45 @@ use std::path::Path;
 use crate::modules::binaries;
 
 /// Conversion & Compression
-/// bitrate : ex "128k", "192k", "320k"
-pub fn convertir(input: &Path, output: &str, bitrate: &str) -> std::io::Result<std::process::Child> {
+/// qualite : VBR 0 (meilleure qualite) a 9 (plus leger), mappe selon le codec de sortie
+pub fn convertir(input: &Path, output: &str, qualite: u32) -> std::io::Result<std::process::Child> {
     let ffmpeg = binaries::get_ffmpeg();
-    crate::log_info(&format!("audio::convertir | ffmpeg={:?} | bitrate={} | {:?} -> {}", ffmpeg, bitrate, input, output));
-    let child = binaries::silent_cmd(ffmpeg)
-        .arg("-i")
-        .arg(input)
-        .arg("-b:a")
-        .arg(bitrate)
-        .arg(output)
-        .arg("-y")
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn();
+    crate::log_info(&format!("audio::convertir | ffmpeg={:?} | qualite={} | {:?} -> {}", ffmpeg, qualite, input, output));
+    let ext = std::path::Path::new(output)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let mut cmd = binaries::silent_cmd(ffmpeg);
+    cmd.arg("-i").arg(input);
+    match ext.as_str() {
+        "mp3" => {
+            cmd.args(["-codec:a", "libmp3lame", "-q:a", &qualite.to_string()]);
+        },
+        "ogg" => {
+            let q = (9u32.saturating_sub(qualite) + 1).min(10);
+            cmd.args(["-codec:a", "libvorbis", "-q:a", &q.to_string()]);
+        },
+        "opus" => {
+            let bitrate = 128u32.saturating_sub(qualite * 10).max(32);
+            cmd.args(["-codec:a", "libopus", "-b:a", &format!("{}k", bitrate)]);
+        },
+        "aac" | "m4a" => {
+            let q = (5u32.saturating_sub(qualite / 2)).max(1);
+            cmd.args(["-codec:a", "aac", "-q:a", &q.to_string()]);
+        },
+        "flac" => {
+            cmd.args(["-codec:a", "flac", "-compression_level", &qualite.to_string()]);
+        },
+        _ => {
+            let bitrate = 320u32.saturating_sub(qualite * 28).max(64);
+            cmd.args(["-b:a", &format!("{}k", bitrate)]);
+        },
+    }
+    cmd.arg("-y").arg(output);
+    cmd.stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    let child = cmd.spawn();
     if let Err(ref e) = child {
         crate::log_error(&format!("audio::convertir impossible de lancer ffmpeg : {}", e));
     }

@@ -86,7 +86,11 @@ struct OxyonApp {
         #[cfg(feature = "api")]
         save_archive_format: bool,
         #[cfg(feature = "api")]
+        archive_niveau: u32,
+        #[cfg(feature = "api")]
         save_audio_format: bool,
+        #[cfg(feature = "api")]
+        audio_qualite: u32,
         #[cfg(feature = "api")]
         save_video_format: bool,
         #[cfg(feature = "api")]
@@ -154,7 +158,11 @@ impl Default for OxyonApp {
                 #[cfg(feature = "api")]
                 save_archive_format: false,
                 #[cfg(feature = "api")]
+                archive_niveau: 6,
+                #[cfg(feature = "api")]
                 save_audio_format: false,
+                #[cfg(feature = "api")]
+                audio_qualite: 2,
                 #[cfg(feature = "api")]
                 save_video_format: false,
                 #[cfg(feature = "api")]
@@ -240,6 +248,9 @@ impl OxyonApp {
                             self.format_choisi = fmt.to_string();
                         }
                     }
+                    if let Some(n) = arc.get("niveau").and_then(|v| v.as_integer()) {
+                        self.archive_niveau = n as u32;
+                    }
                 }
                 #[cfg(feature = "api")]
                 if let Some(aud) = parsed.get("audio") {
@@ -247,6 +258,9 @@ impl OxyonApp {
                         if self.module_actif == ModuleType::Audio {
                             self.format_choisi = fmt.to_string();
                         }
+                    }
+                    if let Some(q) = aud.get("qualite").and_then(|v| v.as_integer()) {
+                        self.audio_qualite = q as u32;
                     }
                 }
                 #[cfg(feature = "api")]
@@ -322,6 +336,12 @@ impl OxyonApp {
                     arc_table.remove("format");
                 }
             }
+            if self.module_actif == ModuleType::Archive {
+                let archive = parsed.entry("archive").or_insert(toml::Value::Table(toml::Table::new()));
+                if let Some(arc_table) = archive.as_table_mut() {
+                    arc_table.insert("niveau".to_string(), toml::Value::Integer(self.archive_niveau as i64));
+                }
+            }
             if self.save_audio_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Audio {
                 let audio = parsed.entry("audio").or_insert(toml::Value::Table(toml::Table::new()));
                 if let Some(aud_table) = audio.as_table_mut() {
@@ -330,6 +350,12 @@ impl OxyonApp {
             } else if !self.save_audio_format && self.module_actif == ModuleType::Audio {
                 if let Some(aud_table) = parsed.get_mut("audio").and_then(|v| v.as_table_mut()) {
                     aud_table.remove("format");
+                }
+            }
+            if self.module_actif == ModuleType::Audio {
+                let audio = parsed.entry("audio").or_insert(toml::Value::Table(toml::Table::new()));
+                if let Some(aud_table) = audio.as_table_mut() {
+                    aud_table.insert("qualite".to_string(), toml::Value::Integer(self.audio_qualite as i64));
                 }
             }
             if self.save_video_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Video {
@@ -405,6 +431,10 @@ impl OxyonApp {
         let video_speed = self.video_speed;
         #[cfg(feature = "api")]
         let audio_action = self.audio_action.clone();
+        #[cfg(feature = "api")]
+        let audio_qualite = self.audio_qualite;
+        #[cfg(feature = "api")]
+        let archive_niveau = self.archive_niveau;
         let img_action = self.image_action.clone();
         let angle = self.rotation_angle;
         let crop_x = self.crop_x;
@@ -473,8 +503,8 @@ impl OxyonApp {
                 let result: Result<(), String> = match module {
                     #[cfg(feature = "api")]
                     ModuleType::Archive => {
-                        log_info(&format!("Archive: compression fmt={} | {:?}", fmt, input));
-                        if modules::archive::compresser(&input, &out_str, &fmt) {
+                        log_info(&format!("Archive: compression fmt={} niveau={} | {:?}", fmt, archive_niveau, input));
+                        if modules::archive::compresser(&input, &out_str, &fmt, archive_niveau) {
                             Ok(())
                         } else {
                             Err(format!("compresser() a retourné false | fmt={} | fichier={:?}", fmt, input))
@@ -505,7 +535,7 @@ impl OxyonApp {
                             },
                             _ => {
                                 log_info(&format!("Audio: conversion | {:?}", input));
-                                match modules::audio::convertir(&input, &out_str, "192k") {
+                                match modules::audio::convertir(&input, &out_str, audio_qualite) {
                                     Ok(mut child) => {
                                         match child.wait() {
                                             Ok(status) if status.success() => Ok(()),
@@ -801,6 +831,9 @@ impl eframe::App for OxyonApp {
                             }
                         });
                     });
+                    if ui.add(egui::Slider::new(&mut self.archive_niveau, 1..=9).text("Compression (1=fast, 9=quality")).changed() {
+                        self.save_config();
+                    }
                     if ui.checkbox(&mut self.save_archive_format, "💾 Sauvegarder ce format").changed() {
                         self.save_config();
                     }
@@ -981,7 +1014,7 @@ impl eframe::App for OxyonApp {
                             if ui.checkbox(&mut self.save_image_format, "💾 Sauvegarder ce format").changed() {
                                 self.save_config();
                             }
-                            if ui.add(egui::Slider::new(&mut self.ratio_img, 1..=10).text("Qualité/Ratio")).changed() {
+                            if ui.add(egui::Slider::new(&mut self.ratio_img, 1..=10).text("Quality (1=fast, 10=quality)")).changed() {
                                 self.save_config();
                             }
                         },
@@ -1068,6 +1101,9 @@ impl eframe::App for OxyonApp {
                                     }
                                 });
                             });
+                            if ui.add(egui::Slider::new(&mut self.audio_qualite, 0..=9).text("VBR (1=fast, 9=quality)")).changed() {
+                                self.save_config();
+                            }
                             if ui.checkbox(&mut self.save_audio_format, "💾 Sauvegarder ce format").changed() {
                                 self.save_config();
                             }
@@ -1089,7 +1125,7 @@ impl eframe::App for OxyonApp {
                         });
                         if ui.checkbox(&mut self.copie_flux, "Copie flux").changed() { self.save_config(); }
                     });
-                    if ui.add(egui::Slider::new(&mut self.video_speed, 0..=8).text("Vitesse (0=qualité, 8=rapide)")).changed() {
+                    if ui.add(egui::Slider::new(&mut self.video_speed, 0..=8).text("Quality (1=fast, 8=quality)")).changed() {
                         self.save_config();
                     }
                     if ui.checkbox(&mut self.save_video_format, "💾 Sauvegarder ce format").changed() {

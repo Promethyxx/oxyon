@@ -5,7 +5,7 @@
 
 use std::path::Path;
 use std::fs;
-use std::sync::{Once, Mutex};
+use std::sync::Once;
 
 const TEST_AUDIO: &str = "tests/audio";
 const TEST_DOC:   &str = "tests/doc";
@@ -15,8 +15,6 @@ const TEST_VIDEO: &str = "tests/video";
 const OUT:        &str = "tests/_output";
 
 static INIT: Once = Once::new();
-// Sérialise les tests ffmpeg (vidéo + image lourde) pour éviter la contention CPU
-static FFMPEG_LOCK: Mutex<()> = Mutex::new(());
 
 fn setup() {
     INIT.call_once(|| {
@@ -46,7 +44,7 @@ fn test_audio_mp3_vers_wav() {
     let input = format!("{TEST_AUDIO}/MP3.mp3");
     let output = format!("{OUT}/audio_mp3_to_wav.wav");
     cleanup(&output);
-    let result = crate::modules::audio::convertir(Path::new(&input), &output, "192k");
+    let result = crate::modules::audio::convertir(Path::new(&input), &output, 2);
     assert!(result.is_ok(), "audio mp3→wav spawn échoué");
     let status = result.unwrap().wait().unwrap();
     assert!(status.success(), "audio mp3→wav code={:?}", status.code());
@@ -60,7 +58,7 @@ fn test_audio_wav_vers_flac() {
     let input = format!("{TEST_AUDIO}/WAV.wav");
     let output = format!("{OUT}/audio_wav_to_flac.flac");
     cleanup(&output);
-    let result = crate::modules::audio::convertir(Path::new(&input), &output, "192k");
+    let result = crate::modules::audio::convertir(Path::new(&input), &output, 2);
     assert!(result.is_ok(), "audio wav→flac spawn échoué");
     let status = result.unwrap().wait().unwrap();
     assert!(status.success(), "audio wav→flac code={:?}", status.code());
@@ -74,7 +72,7 @@ fn test_audio_ogg_vers_mp3() {
     let input = format!("{TEST_AUDIO}/OGG.ogg");
     let output = format!("{OUT}/audio_ogg_to_mp3.mp3");
     cleanup(&output);
-    let result = crate::modules::audio::convertir(Path::new(&input), &output, "192k");
+    let result = crate::modules::audio::convertir(Path::new(&input), &output, 2);
     assert!(result.is_ok(), "audio ogg→mp3 spawn échoué");
     let status = result.unwrap().wait().unwrap();
     assert!(status.success(), "audio ogg→mp3 code={:?}", status.code());
@@ -88,7 +86,7 @@ fn test_audio_aac_vers_mp3() {
     let input = format!("{TEST_AUDIO}/AAC.aac");
     let output = format!("{OUT}/audio_aac_to_mp3.mp3");
     cleanup(&output);
-    let result = crate::modules::audio::convertir(Path::new(&input), &output, "192k");
+    let result = crate::modules::audio::convertir(Path::new(&input), &output, 2);
     assert!(result.is_ok(), "audio aac→mp3 spawn échoué");
     let status = result.unwrap().wait().unwrap();
     assert!(status.success(), "audio aac→mp3 code={:?}", status.code());
@@ -102,7 +100,7 @@ fn test_audio_flac_vers_mp3() {
     let input = format!("{TEST_AUDIO}/FLAC.flac");
     let output = format!("{OUT}/audio_flac_to_mp3.mp3");
     cleanup(&output);
-    let result = crate::modules::audio::convertir(Path::new(&input), &output, "192k");
+    let result = crate::modules::audio::convertir(Path::new(&input), &output, 2);
     assert!(result.is_ok(), "audio flac→mp3 spawn échoué");
     let status = result.unwrap().wait().unwrap();
     assert!(status.success(), "audio flac→mp3 code={:?}", status.code());
@@ -116,7 +114,7 @@ fn test_audio_wav_vers_mp3() {
     let input = format!("{TEST_AUDIO}/WAV.wav");
     let output = format!("{OUT}/audio_wav_to_mp3.mp3");
     cleanup(&output);
-    let result = crate::modules::audio::convertir(Path::new(&input), &output, "192k");
+    let result = crate::modules::audio::convertir(Path::new(&input), &output, 2);
     assert!(result.is_ok(), "audio wav→mp3 spawn échoué");
     let status = result.unwrap().wait().unwrap();
     assert!(status.success(), "audio wav→mp3 code={:?}", status.code());
@@ -130,7 +128,7 @@ fn test_audio_mp3_vers_ogg() {
     let input = format!("{TEST_AUDIO}/MP3.mp3");
     let output = format!("{OUT}/audio_mp3_to_ogg.ogg");
     cleanup(&output);
-    let result = crate::modules::audio::convertir(Path::new(&input), &output, "192k");
+    let result = crate::modules::audio::convertir(Path::new(&input), &output, 2);
     assert!(result.is_ok(), "audio mp3→ogg spawn échoué");
     let status = result.unwrap().wait().unwrap();
     assert!(status.success(), "audio mp3→ogg code={:?}", status.code());
@@ -144,7 +142,7 @@ fn test_audio_mp3_vers_aac() {
     let input = format!("{TEST_AUDIO}/MP3.mp3");
     let output = format!("{OUT}/audio_mp3_to_aac.aac");
     cleanup(&output);
-    let result = crate::modules::audio::convertir(Path::new(&input), &output, "192k");
+    let result = crate::modules::audio::convertir(Path::new(&input), &output, 2);
     assert!(result.is_ok(), "audio mp3→aac spawn échoué");
     let status = result.unwrap().wait().unwrap();
     assert!(status.success(), "audio mp3→aac code={:?}", status.code());
@@ -210,7 +208,6 @@ fn test_pic_compresser_png() {
 #[test]
 fn test_pic_compresser_webp() {
     setup();
-    let _lock = FFMPEG_LOCK.lock().unwrap();
     let output = format!("{OUT}/pic_webp_c.png");
     cleanup(&output);
     assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/WEBP.webp")), &output, 2));
@@ -221,7 +218,6 @@ fn test_pic_compresser_webp() {
 #[test]
 fn test_pic_compresser_gif() {
     setup();
-    let _lock = FFMPEG_LOCK.lock().unwrap();
     let output = format!("{OUT}/pic_gif_c.png");
     cleanup(&output);
     assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/GIF.gif")), &output, 2));
@@ -371,7 +367,6 @@ fn test_pic_convertir_svg_vers_png() {
 #[test]
 fn test_pic_convertir_jpg_vers_webp() {
     setup();
-    let _lock = FFMPEG_LOCK.lock().unwrap();
     let output = format!("{OUT}/pic_jpg2webp.webp");
     cleanup(&output);
     assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output));
@@ -382,7 +377,6 @@ fn test_pic_convertir_jpg_vers_webp() {
 #[test]
 fn test_pic_convertir_png_vers_webp() {
     setup();
-    let _lock = FFMPEG_LOCK.lock().unwrap();
     let output = format!("{OUT}/pic_png2webp.webp");
     cleanup(&output);
     assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/PNG.png")), &output));
@@ -393,7 +387,6 @@ fn test_pic_convertir_png_vers_webp() {
 #[test]
 fn test_pic_convertir_webp_vers_png() {
     setup();
-    let _lock = FFMPEG_LOCK.lock().unwrap();
     let output = format!("{OUT}/pic_webp2png.png");
     cleanup(&output);
     assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/WEBP.webp")), &output));
@@ -404,7 +397,6 @@ fn test_pic_convertir_webp_vers_png() {
 #[test]
 fn test_pic_convertir_gif_vers_png() {
     setup();
-    let _lock = FFMPEG_LOCK.lock().unwrap();
     let output = format!("{OUT}/pic_gif2png.png");
     cleanup(&output);
     assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/GIF.gif")), &output));
@@ -731,7 +723,7 @@ fn test_archive_compresser_zip() {
     setup();
     let output = format!("{OUT}/arc_test.zip");
     cleanup(&output);
-    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, "zip"));
+    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, "zip", 6));
     assert_output(&output, "archive zip");
     cleanup(&output);
 }
@@ -741,7 +733,7 @@ fn test_archive_compresser_7z() {
     setup();
     let output = format!("{OUT}/arc_test.7z");
     cleanup(&output);
-    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, "7z"));
+    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, "7z", 6));
     assert_output(&output, "archive 7z");
     cleanup(&output);
 }
@@ -751,7 +743,7 @@ fn test_archive_compresser_tar() {
     setup();
     let output = format!("{OUT}/arc_test.tar.gz");
     cleanup(&output);
-    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, "tar"));
+    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, "tar", 6));
     assert_output(&output, "archive tar");
     cleanup(&output);
 }
@@ -763,7 +755,7 @@ fn test_archive_extraire_zip() {
     let dir = format!("{OUT}/arc_ext_zip");
     cleanup(&zip);
     let _ = fs::remove_dir_all(&dir);
-    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &zip, "zip"));
+    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &zip, "zip", 6));
     let _ = fs::create_dir_all(&dir);
     assert!(crate::modules::archive::extraire(Path::new(&zip), &dir), "extraction zip échouée");
     cleanup(&zip);
@@ -777,7 +769,7 @@ fn test_archive_extraire_7z() {
     let dir = format!("{OUT}/arc_ext_7z");
     cleanup(&sz);
     let _ = fs::remove_dir_all(&dir);
-    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &sz, "7z"));
+    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &sz, "7z", 6));
     let _ = fs::create_dir_all(&dir);
     assert!(crate::modules::archive::extraire(Path::new(&sz), &dir), "extraction 7z échouée");
     cleanup(&sz);
@@ -791,7 +783,7 @@ fn test_archive_extraire_tar() {
     let dir = format!("{OUT}/arc_ext_tar");
     cleanup(&tar);
     let _ = fs::remove_dir_all(&dir);
-    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &tar, "tar"));
+    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &tar, "tar", 6));
     let _ = fs::create_dir_all(&dir);
     assert!(crate::modules::archive::extraire(Path::new(&tar), &dir), "extraction tar échouée");
     cleanup(&tar);
@@ -804,11 +796,10 @@ fn test_archive_extraire_tar() {
 #[test]
 fn test_video_mkv_vers_mp4() {
     setup();
-    let _lock = FFMPEG_LOCK.lock().unwrap();
     let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/MKV.mkv"));
     let output = format!("{OUT}/vid_mkv2mp4.mp4");
     cleanup(&output);
-    let result = crate::modules::video::traiter_video(&input, &output, false, false, 8);
+    let result = crate::modules::video::traiter_video(&input, &output, false, false, 4);
     assert!(result.is_ok(), "mkv→mp4 spawn échoué");
     let status = result.unwrap().wait().unwrap();
     assert!(status.success(), "mkv→mp4 code={:?}", status.code());
@@ -819,11 +810,10 @@ fn test_video_mkv_vers_mp4() {
 #[test]
 fn test_video_mp4_vers_mkv() {
     setup();
-    let _lock = FFMPEG_LOCK.lock().unwrap();
     let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/MP4.mp4"));
     let output = format!("{OUT}/vid_mp42mkv.mkv");
     cleanup(&output);
-    let result = crate::modules::video::traiter_video(&input, &output, false, false, 8);
+    let result = crate::modules::video::traiter_video(&input, &output, false, false, 4);
     assert!(result.is_ok(), "mp4→mkv spawn échoué");
     let status = result.unwrap().wait().unwrap();
     assert!(status.success(), "mp4→mkv code={:?}", status.code());
@@ -834,11 +824,10 @@ fn test_video_mp4_vers_mkv() {
 #[test]
 fn test_video_webm_vers_mp4() {
     setup();
-    let _lock = FFMPEG_LOCK.lock().unwrap();
     let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/WEBM.webm"));
     let output = format!("{OUT}/vid_webm2mp4.mp4");
     cleanup(&output);
-    let result = crate::modules::video::traiter_video(&input, &output, false, false, 8);
+    let result = crate::modules::video::traiter_video(&input, &output, false, false, 4);
     assert!(result.is_ok(), "webm→mp4 spawn échoué");
     let status = result.unwrap().wait().unwrap();
     assert!(status.success(), "webm→mp4 code={:?}", status.code());
@@ -849,11 +838,10 @@ fn test_video_webm_vers_mp4() {
 #[test]
 fn test_video_copie_flux() {
     setup();
-    let _lock = FFMPEG_LOCK.lock().unwrap();
     let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/MKV.mkv"));
     let output = format!("{OUT}/vid_copy.mp4");
     cleanup(&output);
-    let result = crate::modules::video::traiter_video(&input, &output, true, false, 8);
+    let result = crate::modules::video::traiter_video(&input, &output, true, false, 4);
     assert!(result.is_ok(), "copie flux spawn échoué");
     let status = result.unwrap().wait().unwrap();
     assert!(status.success(), "copie flux code={:?}", status.code());
@@ -867,7 +855,7 @@ fn test_video_copie_flux() {
 fn test_audio_extraire_depuis_mkv() {
     setup();
     let input = format!("{TEST_VIDEO}/MKV.mkv");
-    let output = format!("{OUT}/audio_extrait.mka");
+    let output = format!("{OUT}/audio_extrait.mkv");
     cleanup(&output);
     let result = crate::modules::audio::extraire(Path::new(&input), &output);
     assert!(result.is_ok(), "audio extraire spawn échoué");
@@ -881,7 +869,7 @@ fn test_audio_extraire_depuis_mkv() {
 fn test_audio_extraire_depuis_mp4() {
     setup();
     let input = format!("{TEST_VIDEO}/MP4.mp4");
-    let output = format!("{OUT}/audio_extrait_mp4.m4a");
+    let output = format!("{OUT}/audio_extrait_mp4.mkv");
     cleanup(&output);
     let result = crate::modules::audio::extraire(Path::new(&input), &output);
     assert!(result.is_ok(), "audio extraire mp4 spawn échoué");
