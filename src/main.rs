@@ -86,6 +86,10 @@ struct OxyonApp {
         rename_cfg: modules::rename::RenameConfig,
         rename_previews: Vec<(std::path::PathBuf, String)>,
         rename_results: Vec<modules::rename::RenameResult>,
+        rename_multi_find: String,
+        rename_multi_replace: String,
+        rename_ant_sets: Vec<String>,
+        rename_ant_path: Option<PathBuf>,
         tmdb_api_key: String,
         fanart_api_key: String,
         save_doc_format: bool,
@@ -210,6 +214,10 @@ impl Default for OxyonApp {
                 rename_cfg: modules::rename::RenameConfig::default(),
                 rename_previews: Vec::new(),
                 rename_results: Vec::new(),
+                rename_multi_find: String::new(),
+                rename_multi_replace: String::new(),
+                rename_ant_sets: Vec::new(),
+                rename_ant_path: None,
                 lang: &crate::lang::EN,
                 lang_id: "en",
         }
@@ -1237,13 +1245,155 @@ impl eframe::App for OxyonApp {
                         // ── Find & Replace ──────────────────────────────────
                         ui.collapsing(self.lang.rename_find_replace, |ui| {
                             ui.horizontal(|ui| {
-                                ui.label(self.lang.rename_find);
-                                ui.text_edit_singleline(&mut self.rename_cfg.find);
+                                ui.selectable_value(&mut self.rename_cfg.multi_replace, false, "Simple"); // TODO lang
+                                ui.selectable_value(&mut self.rename_cfg.multi_replace, true, "Multiple"); // TODO lang
                             });
-                            ui.horizontal(|ui| {
-                                ui.label(self.lang.rename_replace_with);
-                                ui.text_edit_singleline(&mut self.rename_cfg.replace_with);
-                            });
+                            if !self.rename_cfg.multi_replace {
+                                // ── Mode simple ──
+                                ui.horizontal(|ui| {
+                                    ui.label(self.lang.rename_find);
+                                    ui.text_edit_singleline(&mut self.rename_cfg.find);
+                                });
+                                ui.horizontal(|ui| {
+                                    ui.label(self.lang.rename_replace_with);
+                                    ui.text_edit_singleline(&mut self.rename_cfg.replace_with);
+                                });
+                            } else {
+                                // ── Mode multiple ──
+                                ui.horizontal(|ui| {
+                                    ui.label(self.lang.rename_find);
+                                    ui.add(egui::TextEdit::singleline(&mut self.rename_multi_find).desired_width(150.0));
+                                    ui.label(self.lang.rename_replace_with);
+                                    ui.add(egui::TextEdit::singleline(&mut self.rename_multi_replace).desired_width(150.0));
+                                    if ui.button("➕").on_hover_text("Add rule").clicked() && !self.rename_multi_find.is_empty() { // TODO lang
+                                        self.rename_cfg.replace_list.add(
+                                            self.rename_multi_find.clone(),
+                                            self.rename_multi_replace.clone(),
+                                        );
+                                        self.rename_multi_find.clear();
+                                        self.rename_multi_replace.clear();
+                                    }
+                                });
+                                // Import / Export (toujours visible en haut)
+                                ui.horizontal(|ui| {
+                                    if ui.button("💾 Save").clicked() { // TODO lang
+                                        if let Some(path) = rfd::FileDialog::new()
+                                            .add_filter("TSV", &["tsv"])
+                                            .set_file_name("replace_rules.tsv")
+                                            .save_file()
+                                        {
+                                            if let Err(e) = self.rename_cfg.replace_list.save(&path) {
+                                                log_error(&format!("Save replace list: {}", e));
+                                            }
+                                        }
+                                    }
+                                    if ui.button("📂 Load").clicked() { // TODO lang
+                                        if let Some(path) = rfd::FileDialog::new()
+                                            .add_filter("TSV", &["tsv"])
+                                            .pick_file()
+                                        {
+                                            match modules::rename::ReplaceList::load(&path) {
+                                                Ok(list) => self.rename_cfg.replace_list = list,
+                                                Err(e) => log_error(&format!("Load replace list: {}", e)),
+                                            }
+                                        }
+                                    }
+                                    if ui.button("📂 Ant Renamer").clicked() { // TODO lang
+                                        if let Some(path) = rfd::FileDialog::new()
+                                            .add_filter("XML", &["xml"])
+                                            .pick_file()
+                                        {
+                                            match modules::rename::ReplaceList::list_ant_renamer_sets(&path) {
+                                                Ok(sets) if sets.is_empty() => {
+                                                    // Pas de sets nommés, charger CurrentList
+                                                    match modules::rename::ReplaceList::load_ant_renamer_xml(&path, None) {
+                                                        Ok(list) => self.rename_cfg.replace_list = list,
+                                                        Err(e) => log_error(&format!("Import Ant Renamer: {}", e)),
+                                                    }
+                                                }
+                                                Ok(sets) if sets.len() == 1 => {
+                                                    // Un seul set, charger directement
+                                                    match modules::rename::ReplaceList::load_ant_renamer_xml(&path, Some(&sets[0])) {
+                                                        Ok(list) => self.rename_cfg.replace_list = list,
+                                                        Err(e) => log_error(&format!("Import Ant Renamer: {}", e)),
+                                                    }
+                                                }
+                                                Ok(sets) => {
+                                                    // Plusieurs sets → afficher le sélecteur
+                                                    self.rename_ant_sets = sets;
+                                                    self.rename_ant_path = Some(path);
+                                                }
+                                                Err(e) => log_error(&format!("Import Ant Renamer: {}", e)),
+                                            }
+                                        }
+                                    }
+                                    if ui.button("🗑").on_hover_text("Clear all rules").clicked() { // TODO lang
+                                        self.rename_cfg.replace_list.rules.clear();
+                                    }
+                                });
+                                // Sélecteur de Set Ant Renamer (affiché si plusieurs sets disponibles)
+                                if !self.rename_ant_sets.is_empty() {
+                                    ui.horizontal(|ui| {
+                                        ui.label("Set :"); // TODO lang
+                                        for set_name in self.rename_ant_sets.clone() {
+                                            if ui.button(&set_name).clicked() {
+                                                if let Some(ref path) = self.rename_ant_path {
+                                                    match modules::rename::ReplaceList::load_ant_renamer_xml(path, Some(&set_name)) {
+                                                        Ok(list) => self.rename_cfg.replace_list = list,
+                                                        Err(e) => log_error(&format!("Import Ant Renamer set '{}': {}", set_name, e)),
+                                                    }
+                                                }
+                                                self.rename_ant_sets.clear();
+                                                self.rename_ant_path = None;
+                                            }
+                                        }
+                                        // Aussi proposer CurrentList
+                                        if ui.button("CurrentList").clicked() {
+                                            if let Some(ref path) = self.rename_ant_path {
+                                                match modules::rename::ReplaceList::load_ant_renamer_xml(path, None) {
+                                                    Ok(list) => self.rename_cfg.replace_list = list,
+                                                    Err(e) => log_error(&format!("Import Ant Renamer CurrentList: {}", e)),
+                                                }
+                                            }
+                                            self.rename_ant_sets.clear();
+                                            self.rename_ant_path = None;
+                                        }
+                                        if ui.button("✖").clicked() {
+                                            self.rename_ant_sets.clear();
+                                            self.rename_ant_path = None;
+                                        }
+                                    });
+                                }
+                                // Tableau des règles (scrollable)
+                                let mut to_remove: Option<usize> = None;
+                                let mut to_move_up: Option<usize> = None;
+                                let mut to_move_down: Option<usize> = None;
+                                if !self.rename_cfg.replace_list.rules.is_empty() {
+                                    egui::ScrollArea::vertical().max_height(200.0).id_salt("multi_replace_scroll").show(ui, |ui| {
+                                        egui::Grid::new("multi_replace_grid").striped(true).show(ui, |ui| {
+                                            ui.label(""); // checkbox col
+                                            ui.strong(self.lang.rename_find);
+                                            ui.strong(self.lang.rename_replace_with);
+                                            ui.label(""); // actions
+                                            ui.end_row();
+                                            for (i, rule) in self.rename_cfg.replace_list.rules.iter_mut().enumerate() {
+                                                ui.checkbox(&mut rule.enabled, "");
+                                                ui.add(egui::TextEdit::singleline(&mut rule.find).desired_width(140.0));
+                                                ui.add(egui::TextEdit::singleline(&mut rule.replace).desired_width(140.0));
+                                                ui.horizontal(|ui| {
+                                                    if ui.small_button("▲").clicked() { to_move_up = Some(i); }
+                                                    if ui.small_button("▼").clicked() { to_move_down = Some(i); }
+                                                    if ui.small_button("🗑").clicked() { to_remove = Some(i); }
+                                                });
+                                                ui.end_row();
+                                            }
+                                        });
+                                    });
+                                }
+                                if let Some(i) = to_move_up { self.rename_cfg.replace_list.move_up(i); }
+                                if let Some(i) = to_move_down { self.rename_cfg.replace_list.move_down(i); }
+                                if let Some(i) = to_remove { self.rename_cfg.replace_list.remove(i); }
+                            }
                         });
 
                         // ── Insertion ───────────────────────────────────────
@@ -1255,6 +1405,8 @@ impl eframe::App for OxyonApp {
                             ui.horizontal(|ui| {
                                 ui.label(self.lang.rename_at_pos);
                                 ui.add(egui::DragValue::new(&mut self.rename_cfg.insert_pos).range(0..=999));
+                                ui.selectable_value(&mut self.rename_cfg.insert_from_end, false, "↦ From start"); // TODO lang
+                                ui.selectable_value(&mut self.rename_cfg.insert_from_end, true, "↤ From end"); // TODO lang
                             });
                         });
 
@@ -1266,6 +1418,8 @@ impl eframe::App for OxyonApp {
                                 ui.add(egui::DragValue::new(&mut self.rename_cfg.delete_from).range(0..=999));
                                 ui.label(self.lang.rename_count);
                                 ui.add(egui::DragValue::new(&mut self.rename_cfg.delete_count).range(0..=999));
+                                ui.selectable_value(&mut self.rename_cfg.delete_from_end, false, "↦ From start"); // TODO lang
+                                ui.selectable_value(&mut self.rename_cfg.delete_from_end, true, "↤ From end"); // TODO lang
                             });
                         });
 
