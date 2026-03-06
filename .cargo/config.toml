@@ -7,3 +7,5 @@ rustflags = [
     "-C", "link-arg=-L/var/home/promethyxx/cross-libs",
     "-C", "link-arg=-static-libgcc"
 ]
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
