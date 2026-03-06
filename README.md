@@ -9,7 +9,7 @@
 
 Oxyon is a desktop multimedia toolkit built with Rust and [egui](https://github.com/emilide/egui). It handles file conversion, renaming, tagging and scraping in a single GUI application, with bundled binaries (ffmpeg, ffprobe, mkvpropedit) — no external tools to install.
 
-**Oxyon Office** is a lightweight variant with only document and image conversion, no bundled binaries and no API calls.
+**Oxyon Desk** is a lightweight variant with only document and image conversion, no bundled binaries and no API calls.
 
 Available in English and French.
 
@@ -28,7 +28,7 @@ Available in English and French.
 | Build | Platforms | Content |
 |-------|-----------|---------|
 | Oxyon | Windows x64, Linux x64, Linux ARM64 | Full feature set with bundled binaries |
-| Oxyon Office | Windows x64, Linux x64, Linux ARM64 | Document & image & renamer only |
+| Oxyon Desk | Windows x64, Linux x64, Linux ARM64 | Document & image & renamer only |
 
 ## Quick Start
 
