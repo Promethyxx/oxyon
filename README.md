@@ -22,14 +22,14 @@ Oxyon Desk brings those capabilities locally: document conversion, image process
 | Module | Oxyon | Oxyon Desk |
 |--------|:-----:|:----------:|
 | Archives (7Z, ZIP, TAR) | ✅ | ✅ |
-| Audio (MP3, FLAC, AAC, OGG) | ✅ | — |
+| Audio (MP3, FLAC, AAC, OGG) | ✅ | ❌ |
 | Documents (DOCX, PDF, MD, ODT, HTML, LaTeX) | ✅ | ✅ |
 | File renamer (find/replace, insert, numbering, case, extensions) | ✅ | ✅ |
 | Pictures (15+ formats: AVIF, JXL, RAW, SVG, PSD, WebP, EXR…) | ✅ | ✅ |
-| Scraper (TMDB, Fanart) | ✅ | — |
-| Tagger (MKV tagging) | ✅ | — |
+| Scraper (TMDB, Fanart) | ✅ | ❌ |
+| Tagger (MKV tagging) | ✅ | ❌ |
 | Tools | ✅ | ✅ |
-| Video (mkv, mp4, webm) | ✅ | — |
+| Video (mkv, mp4, webm) | ✅ | ❌ |
 
 
 ## Key differences
