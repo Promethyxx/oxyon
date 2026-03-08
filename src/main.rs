@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod lang;
+pub mod logging;
+pub use logging::{log_info, log_warn, log_error};
 pub mod modules;
 #[cfg(test)]
 #[path = "test.rs"]
@@ -13,30 +15,6 @@ use std::sync::{Arc, Mutex};
 use std::fs::OpenOptions;
 use std::io::Write;
 
-// ─────────────────────────────────────────────
-//  SYSTÈME DE LOG
-// ─────────────────────────────────────────────
-fn log_entry(level: &str, message: &str) {
-    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
-    let thread = std::thread::current();
-    let thread_name = thread.name().unwrap_or("worker");
-    let log_line = format!("[{}] [{}] [{}] {}\n", timestamp, level, thread_name, message);
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("oxyon.log")
-    {
-        let _ = file.write_all(log_line.as_bytes());
-    }
-    // Aussi visible en console debug
-    eprintln!("{}", log_line.trim());
-}
-
-fn log_info(msg: &str)  { log_entry("INFO",  msg); }
-fn log_warn(msg: &str)  { log_entry("WARN",  msg); }
-fn log_error(msg: &str) { log_entry("ERROR", msg); }
-
-// ─────────────────────────────────────────────
 
 #[cfg(feature = "api")]
 #[derive(Clone)]

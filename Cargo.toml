@@ -1,11 +1,20 @@
 [package]
 name = "oxyon"
-version = "1.7.1"
+version = "2.0.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 
+[[bin]]
+name = "oxyon"
+path = "src/main.rs"
+
+[[bin]]
+name = "oxyon-cli"
+path = "src/main_cli.rs"
+
 [dependencies]
 chrono = "0.4.43"
+clap = { version = "4", features = ["derive"] }
 dotenvy = "0.15"
 eframe = "0.33.3"
 flate2 = "1.1"
