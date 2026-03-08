@@ -7,15 +7,22 @@
 
 ## What is Oxyon?
 
-Oxyon is a portable desktop toolkit that centralizes a collection of everyday multimedia scripts into a single GUI application, built with Rust and [egui](https://github.com/emilide/egui). Think of it as a Swiss army knife for file processing: conversion, renaming, tagging, scraping — all in one place, with bundled binaries (ffmpeg, ffprobe, mkvpropedit) so there's nothing extra to install.
+Oxyon is a portable desktop toolkit that centralizes a collection of everyday multimedia scripts into a single GUI application.
+Built with Rust and [egui](https://github.com/emilide/egui).
+Think of it as a Swiss army knife for file processing: conversion, renaming, tagging, scraping.
+All in one place, with bundled binaries (ffmpeg, ffprobe, mkvpropedit) so there's nothing extra to install.
 
 Available in English and French.
 
 ## What is Oxyon Desk?
 
-Oxyon Desk was born from a real need. In a professional environment where tools like Adobe Acrobat Pro aren't available, the only option is often to upload sensitive documents to third-party websites (iLovePDF, iLoveIMG) — which never feels right.
+Oxyon Desk was born from a real need.
+In a professional environment where tools like Adobe Acrobat Pro aren't available,
+the only option is often to upload sensitive documents to third-party websites (iLovePDF, iLoveIMG) — which never feels right.
 
-Oxyon Desk brings those capabilities locally: document conversion, image processing, archiving, renaming — all offline, with no external binaries, no API calls, and no data leaving your machine. It's built for professional use where privacy and autonomy matter.
+Oxyon Desk brings those capabilities locally: document conversion, image processing, archiving, renaming.
+All offline, with no external binaries, no API calls, and no data leaving your machine.
+It's built for professional use where privacy and autonomy matter.
 
 ## Modules
 
@@ -46,8 +53,8 @@ Oxyon Desk brings those capabilities locally: document conversion, image process
 
 | | Linux ARM64 | Linux x64 | Mac ARM64 | Windows x64 |
 |---|:---:|:---:|:---:|:---:|
-| Oxyon | ✅ | ✅ | 🔜 | ✅ |
-| Oxyon Desk | ✅ | ✅ | 🔜 | ✅ |
+| Oxyon | ✅ | ✅ | ✅ | ✅ |
+| Oxyon Desk | ✅ | ✅ | ✅ | ✅ |
 
 The source code is Mac ARM ready.
 I don't have any, so I need to compile this with Github CI, which cost a lot of ratio compare to other platforms.
