@@ -21,15 +21,15 @@ Oxyon Desk brings those capabilities locally: document conversion, image process
 
 | Module | Oxyon | Oxyon Desk |
 |--------|:-----:|:----------:|
-| Archives (7Z, ZIP, TAR) | ✓ | ✓ |
-| Audio (MP3, FLAC, AAC, OGG) | ✓ | — |
-| Documents (DOCX, PDF, MD, ODT, HTML, LaTeX) | ✓ | ✓ |
-| File renamer (find/replace, insert, numbering, case, extensions) | ✓ | ✓ |
-| Pictures (15+ formats: AVIF, JXL, RAW, SVG, PSD, WebP, EXR…) | ✓ | ✓ |
-| Scraper (TMDB, Fanart) | ✓ | — |
-| Tagger (MKV tagging) | ✓ | — |
-| Tools | ✓ | ✓ |
-| Video (mkv, mp4, webm) | ✓ | — |
+| Archives (7Z, ZIP, TAR) | ✅ | ✅ |
+| Audio (MP3, FLAC, AAC, OGG) | ✅ | — |
+| Documents (DOCX, PDF, MD, ODT, HTML, LaTeX) | ✅ | ✅ |
+| File renamer (find/replace, insert, numbering, case, extensions) | ✅ | ✅ |
+| Pictures (15+ formats: AVIF, JXL, RAW, SVG, PSD, WebP, EXR…) | ✅ | ✅ |
+| Scraper (TMDB, Fanart) | ✅ | — |
+| Tagger (MKV tagging) | ✅ | — |
+| Tools | ✅ | ✅ |
+| Video (mkv, mp4, webm) | ✅ | — |
 
 
 ## Key differences
@@ -40,7 +40,7 @@ Oxyon Desk brings those capabilities locally: document conversion, image process
 | Bundled binaries | ffmpeg, ffprobe, mkvpropedit | None |
 | API keys required | TMDB and Fanart (for scraping only) | None |
 | Internet access | Only if using the scraper | Never |
-| Portable | ✓ | ✓ |
+| Portable | ✅ | ✅ |
 
 ## Platforms
 
