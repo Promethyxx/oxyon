@@ -1,8 +1,8 @@
 [Desktop Entry]
 Name=Oxyon
-Exec=oxyon
+Exec=Oxyon
 Terminal=false
 Type=Application
 Icon=io.github.promethyxx.Oxyon
 Categories=Utility;
-Comment=Oxyon powerful utility
+Comment=Oxyon
