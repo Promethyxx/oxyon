@@ -39,7 +39,7 @@ sevenz-rust2 = { version = "0.20", features = ["compress"] }
 tar = "0.4"
 toml = "1.0.3"
 which = "8.0.0"
-zip = { version = "8.1", default-features = false, features = ["deflate"] }
+zip = { version = "8.2", default-features = false, features = ["deflate"] }
 zune-core = "0.5"
 zune-jpegxl = "0.5"
 
