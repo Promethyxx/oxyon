@@ -1549,3 +1549,196 @@ pub fn pdf_watermark(
         pdf_watermark_interne(pdf_in, pdf_out, &texte, taille, opacite, pages.as_deref())
     })
 }
+
+// ════════════════════════════════════════════════════════════════════════
+//  PDF ANNOTATE — ajoute une note de texte (annotation) sur les pages
+// ════════════════════════════════════════════════════════════════════════
+
+fn pdf_annoter_interne(
+    input: &Path, output: &str,
+    texte: &str,
+    x: f64, y: f64,
+    largeur: f64, hauteur: f64,
+    pages_cibles: Option<&[u32]>,
+) -> Result<(), String> {
+    let mut doc = Document::load(input)
+        .map_err(|e| format!("Erreur chargement PDF : {}", e))?;
+
+    let pages = obtenir_pages_ordonnees(&doc);
+
+    for (i, &page_id) in pages.iter().enumerate() {
+        let page_num = (i + 1) as u32;
+        if !pages_cibles.map_or(true, |c| c.contains(&page_num)) { continue; }
+
+        let mediabox = obtenir_mediabox(&doc, page_id).unwrap_or([0.0, 0.0, 595.0, 842.0]);
+        let page_w = mediabox[2] - mediabox[0];
+        let page_h = mediabox[3] - mediabox[1];
+
+        // Convertir pourcentages en points
+        let abs_x = mediabox[0] + (page_w * x / 100.0);
+        let abs_y = mediabox[1] + (page_h * y / 100.0);
+        let abs_w = page_w * largeur / 100.0;
+        let abs_h = page_h * hauteur / 100.0;
+
+        let annot_dict = dictionary! {
+            "Type" => "Annot",
+            "Subtype" => "FreeText",
+            "Rect" => vec![
+                Object::Real(abs_x as f32),
+                Object::Real(abs_y as f32),
+                Object::Real((abs_x + abs_w) as f32),
+                Object::Real((abs_y + abs_h) as f32),
+            ],
+            "Contents" => Object::string_literal(texte.to_string()),
+            "DA" => Object::string_literal("/Helv 12 Tf 0 0 0 rg".to_string()),
+            "C" => vec![Object::Real(1.0), Object::Real(1.0), Object::Real(0.8)],
+            "Border" => vec![0.into(), 0.into(), 1.into()],
+        };
+        let annot_id = doc.add_object(annot_dict);
+
+        if let Ok(Object::Dictionary(dict)) = doc.get_object_mut(page_id) {
+            let annots = match dict.get(b"Annots") {
+                Ok(Object::Array(arr)) => {
+                    let mut arr = arr.clone();
+                    arr.push(Object::Reference(annot_id));
+                    arr
+                }
+                Ok(Object::Reference(ref_id)) => {
+                    vec![Object::Reference(*ref_id), Object::Reference(annot_id)]
+                }
+                _ => vec![Object::Reference(annot_id)],
+            };
+            dict.set("Annots", Object::Array(annots));
+        }
+    }
+
+    sauvegarder(&mut doc, output)
+}
+
+pub fn pdf_annoter(
+    input: &Path, output: &str,
+    texte: &str,
+    x: f64, y: f64,
+    largeur: f64, hauteur: f64,
+    pages_cibles: Option<&[u32]>,
+) -> Result<(), String> {
+    let texte = texte.to_string();
+    let x = x; let y = y;
+    let largeur = largeur; let hauteur = hauteur;
+    let pages = pages_cibles.map(|p| p.to_vec());
+    appliquer_operation_doc(input, output, move |pdf_in, pdf_out| {
+        pdf_annoter_interne(pdf_in, pdf_out, &texte, x, y, largeur, hauteur, pages.as_deref())
+    })
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  PDF SIGN — ajoute un texte de signature (nom + date) en bas de page
+// ════════════════════════════════════════════════════════════════════════
+
+fn pdf_signer_interne(
+    input: &Path, output: &str,
+    nom_signataire: &str,
+    position: PositionNumero,
+    taille_police: f64,
+    pages_cibles: Option<&[u32]>,
+) -> Result<(), String> {
+    let mut doc = Document::load(input)
+        .map_err(|e| format!("Erreur chargement PDF : {}", e))?;
+
+    let font_dict = dictionary! {
+        "Type" => "Font",
+        "Subtype" => "Type1",
+        "BaseFont" => "Helvetica-Oblique",
+        "Encoding" => "WinAnsiEncoding",
+    };
+    let font_id = doc.add_object(font_dict);
+
+    // Générer la date au format YYYY-MM-DD
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = now.as_secs();
+    let days = secs / 86400;
+    // Approximation simple : jours depuis epoch → date
+    let (year, month, day) = jours_vers_date(days);
+    let date_str = format!("{:04}-{:02}-{:02}", year, month, day);
+    let texte_sign = format!("Signed: {} - {}", nom_signataire, date_str);
+    let encoded = encoder_winansi(&texte_sign);
+
+    let pages = obtenir_pages_ordonnees(&doc);
+
+    for (i, &page_id) in pages.iter().enumerate() {
+        let page_num = (i + 1) as u32;
+        if !pages_cibles.map_or(true, |c| c.contains(&page_num)) { continue; }
+
+        let mediabox = obtenir_mediabox(&doc, page_id).unwrap_or([0.0, 0.0, 595.0, 842.0]);
+        let largeur = mediabox[2] - mediabox[0];
+        let hauteur = mediabox[3] - mediabox[1];
+
+        let (x, y) = match position {
+            PositionNumero::BasCentre  => (largeur / 2.0 - 80.0, 40.0),
+            PositionNumero::BasGauche  => (40.0, 40.0),
+            PositionNumero::BasDroite  => (largeur - 200.0, 40.0),
+            PositionNumero::HautCentre => (largeur / 2.0 - 80.0, hauteur - 40.0),
+            PositionNumero::HautGauche => (40.0, hauteur - 40.0),
+            PositionNumero::HautDroite => (largeur - 200.0, hauteur - 40.0),
+        };
+
+        // Ligne de signature + texte
+        let content = Content {
+            operations: vec![
+                // Ligne horizontale
+                Operation::new("q", vec![]),
+                Operation::new("w", vec![0.5.into()]),
+                Operation::new("m", vec![x.into(), (y + taille_police + 2.0).into()]),
+                Operation::new("l", vec![(x + 160.0).into(), (y + taille_police + 2.0).into()]),
+                Operation::new("S", vec![]),
+                Operation::new("Q", vec![]),
+                // Texte
+                Operation::new("BT", vec![]),
+                Operation::new("Tf", vec!["Fsig".into(), taille_police.into()]),
+                Operation::new("rg", vec![0.2.into(), 0.2.into(), 0.2.into()]),
+                Operation::new("Td", vec![x.into(), y.into()]),
+                Operation::new("Tj", vec![Object::String(encoded.clone(), lopdf::StringFormat::Literal)]),
+                Operation::new("ET", vec![]),
+            ],
+        };
+        let content_bytes = content.encode()
+            .map_err(|e| format!("Erreur encodage signature : {}", e))?;
+
+        ajouter_overlay_page(&mut doc, page_id, content_bytes, "Fsig", font_id, None)?;
+    }
+
+    sauvegarder(&mut doc, output)
+}
+
+/// Convertit un nombre de jours depuis l'epoch Unix en (année, mois, jour)
+fn jours_vers_date(jours_epoch: u64) -> (u64, u64, u64) {
+    // Algorithme simplifié depuis les jours Unix
+    let z = jours_epoch + 719468;
+    let era = z / 146097;
+    let doe = z - era * 146097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m, d)
+}
+
+pub fn pdf_signer(
+    input: &Path, output: &str,
+    nom_signataire: &str,
+    position: PositionNumero,
+    taille_police: f64,
+    pages_cibles: Option<&[u32]>,
+) -> Result<(), String> {
+    let nom = nom_signataire.to_string();
+    let taille = taille_police;
+    let pages = pages_cibles.map(|p| p.to_vec());
+    appliquer_operation_doc(input, output, move |pdf_in, pdf_out| {
+        pdf_signer_interne(pdf_in, pdf_out, &nom, position, taille, pages.as_deref())
+    })
+}

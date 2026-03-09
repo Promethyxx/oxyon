@@ -1,6 +1,6 @@
 [package]
 name = "oxyon"
-version = "2.0.3"
+version = "2.0.4"
 edition = "2024"
 license = "GPL-3.0-or-later"
 default-run = "Oxyon"
@@ -24,6 +24,7 @@ image = { version = "0.25", features = ["avif", "exr", "gif", "hdr", "ico", "jpe
 jxl-oxide = { version = "0.12", features = ["image"] }
 kamadak-exif = "0.6.1"
 lopdf = "0.39"
+open = "5"
 psd = "0.3"
 pulldown-cmark = "0.13"
 quick-xml = "0.39.0"

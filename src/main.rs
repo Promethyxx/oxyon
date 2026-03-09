@@ -12,8 +12,6 @@ mod test;
 use eframe::egui;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::fs::OpenOptions;
-use std::io::Write;
 
 
 #[cfg(feature = "api")]
@@ -116,6 +114,29 @@ struct OxyonApp {
         pdf_wm_taille: f64,
         pdf_wm_opacite: f64,
         pdf_nouvel_ordre: String,
+        pdf_annot_texte: String,
+        pdf_annot_x: f64,
+        pdf_annot_y: f64,
+        pdf_annot_w: f64,
+        pdf_annot_h: f64,
+        pdf_sign_nom: String,
+        pdf_sign_position: String,
+        pdf_sign_taille: f64,
+        img_wm_texte: String,
+        img_wm_taille: f32,
+        img_wm_opacite: f32,
+        img_meme_top: String,
+        img_meme_bottom: String,
+        img_upscale_factor: u32,
+        ico_size_16: bool,
+        ico_size_32: bool,
+        ico_size_64: bool,
+        ico_size_128: bool,
+        ico_size_256: bool,
+        ico_size_512: bool,
+        ico_size_custom: bool,
+        ico_custom_w: String,
+        ico_custom_h: String,
         max_parallel_jobs: usize,
         active_jobs: Arc<Mutex<usize>>,
         completed_jobs: Arc<Mutex<usize>>,
@@ -197,6 +218,29 @@ impl Default for OxyonApp {
                 pdf_wm_taille: 60.0,
                 pdf_wm_opacite: 0.15,
                 pdf_nouvel_ordre: String::new(),
+                pdf_annot_texte: String::new(),
+                pdf_annot_x: 10.0,
+                pdf_annot_y: 80.0,
+                pdf_annot_w: 30.0,
+                pdf_annot_h: 10.0,
+                pdf_sign_nom: String::new(),
+                pdf_sign_position: "BasDroite".into(),
+                pdf_sign_taille: 10.0,
+                img_wm_texte: "WATERMARK".into(),
+                img_wm_taille: 48.0,
+                img_wm_opacite: 0.3,
+                img_meme_top: String::new(),
+                img_meme_bottom: String::new(),
+                img_upscale_factor: 2,
+                ico_size_16: false,
+                ico_size_32: false,
+                ico_size_64: false,
+                ico_size_128: false,
+                ico_size_256: true,
+                ico_size_512: false,
+                ico_size_custom: false,
+                ico_custom_w: String::new(),
+                ico_custom_h: String::new(),
                 max_parallel_jobs: 4,
                 active_jobs: Arc::new(Mutex::new(0)),
                 completed_jobs: Arc::new(Mutex::new(0)),
@@ -508,6 +552,38 @@ impl OxyonApp {
         let pdf_wm_taille = self.pdf_wm_taille;
         let pdf_wm_opacite = self.pdf_wm_opacite;
         let pdf_nouvel_ordre = self.pdf_nouvel_ordre.clone();
+        let pdf_annot_texte = self.pdf_annot_texte.clone();
+        let pdf_annot_x = self.pdf_annot_x;
+        let pdf_annot_y = self.pdf_annot_y;
+        let pdf_annot_w = self.pdf_annot_w;
+        let pdf_annot_h = self.pdf_annot_h;
+        let pdf_sign_nom = self.pdf_sign_nom.clone();
+        let pdf_sign_position = self.pdf_sign_position.clone();
+        let pdf_sign_taille = self.pdf_sign_taille;
+        let img_wm_texte = self.img_wm_texte.clone();
+        let img_wm_taille = self.img_wm_taille;
+        let img_wm_opacite = self.img_wm_opacite;
+        let img_meme_top = self.img_meme_top.clone();
+        let img_meme_bottom = self.img_meme_bottom.clone();
+        let img_upscale_factor = self.img_upscale_factor;
+        let ico_sizes: Vec<u32> = {
+            let mut s = Vec::new();
+            if self.ico_size_16 { s.push(16); }
+            if self.ico_size_32 { s.push(32); }
+            if self.ico_size_64 { s.push(64); }
+            if self.ico_size_128 { s.push(128); }
+            if self.ico_size_256 { s.push(256); }
+            if self.ico_size_512 { s.push(512); }
+            if self.ico_size_custom {
+                if let Ok(w) = self.ico_custom_w.parse::<u32>() {
+                    if w > 0 { s.push(w); }
+                }
+            }
+            if s.is_empty() { s.push(256); }
+            s
+        };
+        let convert_resize_w = self.resize_width.parse::<u32>().unwrap_or(0);
+        let convert_resize_h = self.resize_height.parse::<u32>().unwrap_or(0);
         std::thread::spawn(move || {
             loop {
                 let job = {
@@ -748,6 +824,26 @@ impl OxyonApp {
                                 modules::doc::pdf_watermark(&input, &out_str, &pdf_wm_texte, pdf_wm_taille, pdf_wm_opacite, pages_opt.as_deref())
                                     .map_err(|e| format!("pdf_watermark failed: {}", e))
                             },
+                            "pdf_annotate" => {
+                                let pages_opt = parse_pages_spec(&pdf_pages);
+                                log_info(&format!("Doc pdf_annotate: texte='{}' x={} y={} w={} h={}", pdf_annot_texte, pdf_annot_x, pdf_annot_y, pdf_annot_w, pdf_annot_h));
+                                modules::doc::pdf_annoter(&input, &out_str, &pdf_annot_texte, pdf_annot_x, pdf_annot_y, pdf_annot_w, pdf_annot_h, pages_opt.as_deref())
+                                    .map_err(|e| format!("pdf_annotate failed: {}", e))
+                            },
+                            "pdf_sign" => {
+                                let pages_opt = parse_pages_spec(&pdf_pages);
+                                let sign_pos = match pdf_sign_position.as_str() {
+                                    "BasGauche"  => modules::doc::PositionNumero::BasGauche,
+                                    "BasDroite"  => modules::doc::PositionNumero::BasDroite,
+                                    "HautCentre" => modules::doc::PositionNumero::HautCentre,
+                                    "HautGauche" => modules::doc::PositionNumero::HautGauche,
+                                    "HautDroite" => modules::doc::PositionNumero::HautDroite,
+                                    _            => modules::doc::PositionNumero::BasDroite,
+                                };
+                                log_info(&format!("Doc pdf_sign: nom='{}' position={} taille={}", pdf_sign_nom, pdf_sign_position, pdf_sign_taille));
+                                modules::doc::pdf_signer(&input, &out_str, &pdf_sign_nom, sign_pos, pdf_sign_taille, pages_opt.as_deref())
+                                    .map_err(|e| format!("pdf_sign failed: {}", e))
+                            },
                             autre => {
                                 log_warn(&format!("Doc: action inconnue '{}', fallback Convert()", autre));
                                 if modules::doc::convertir(&input, &out_str) {
@@ -768,6 +864,35 @@ impl OxyonApp {
                                         "folder" => modules::pic::convertir_jxl_dossier(&input),
                                         "pivot" => modules::pic::convertir_jxl_pivot(&input),
                                         _ => modules::pic::convertir_jxl_lossless(&input),
+                                    }
+                                } else if fmt.to_uppercase() == "ICO" {
+                                    // ICO : un fichier par taille
+                                    log_info(&format!("Image ICO: sizes={:?}", ico_sizes));
+                                    let stem = input.file_stem().unwrap_or_default().to_string_lossy();
+                                    let parent = input.parent().unwrap();
+                                    let mut all_ok = true;
+                                    for &sz in &ico_sizes {
+                                        let ico_out = parent.join(format!("{}_{sz}x{sz}.ico", stem));
+                                        let ico_str = ico_out.to_string_lossy().to_string();
+                                        log_info(&format!("ICO entry: {}x{} -> {}", sz, sz, ico_str));
+                                        if !modules::pic::generer_ico_multi(&input, &ico_str, &[sz]) {
+                                            log_error(&format!("pic::generer_ico_multi failed | {}x{} | {:?}", sz, sz, input));
+                                            all_ok = false;
+                                        }
+                                    }
+                                    if all_ok { Ok(()) }
+                                    else { Err(format!("ICO: some sizes failed | {:?}", input)) }
+                                } else if convert_resize_w > 0 && convert_resize_h > 0 {
+                                    // Resize before converting
+                                    log_info(&format!("Image Convert+resize: {}x{} fmt={}", convert_resize_w, convert_resize_h, fmt));
+                                    let temp = format!("{}_temp_cvt.png", out_str);
+                                    if modules::pic::redimensionner_pixels(&input, &temp, convert_resize_w, convert_resize_h) {
+                                        let result = if modules::pic::compresser(Path::new(&temp), &out_str, ratio) { Ok(()) }
+                                        else { Err(format!("pic::compresser after resize failed | {:?}", input)) };
+                                        let _ = std::fs::remove_file(&temp);
+                                        result
+                                    } else {
+                                        Err(format!("pic::resize for convert failed | {}x{} | {:?}", convert_resize_w, convert_resize_h, input))
                                     }
                                 } else {
                                     if modules::pic::compresser(&input, &out_str, ratio) { Ok(()) }
@@ -810,6 +935,31 @@ impl OxyonApp {
                                 log_info(&format!("Image crop: x={} y={} w={} h={}", crop_x, crop_y, crop_w, crop_h));
                                 if modules::pic::recadrer(&input, &out_str, crop_x, crop_y, crop_w, crop_h) { Ok(()) }
                                 else { Err(format!("pic::crop failed | x={} y={} w={} h={} | file={:?}", crop_x, crop_y, crop_w, crop_h, input)) }
+                            },
+                            "watermark" => {
+                                log_info(&format!("Image watermark: texte='{}' taille={} opacite={}", img_wm_texte, img_wm_taille, img_wm_opacite));
+                                if modules::pic::watermark(&input, &out_str, &img_wm_texte, img_wm_taille, img_wm_opacite) { Ok(()) }
+                                else { Err(format!("pic::watermark failed for {:?}", input)) }
+                            },
+                            "meme" => {
+                                log_info(&format!("Image meme: top='{}' bottom='{}'", img_meme_top, img_meme_bottom));
+                                if modules::pic::meme(&input, &out_str, &img_meme_top, &img_meme_bottom) { Ok(()) }
+                                else { Err(format!("pic::meme failed for {:?}", input)) }
+                            },
+                            "upscale" => {
+                                log_info(&format!("Image upscale: factor={}x", img_upscale_factor));
+                                if modules::pic::upscale(&input, &out_str, img_upscale_factor) { Ok(()) }
+                                else { Err(format!("pic::upscale failed for {:?}", input)) }
+                            },
+                            "html_to_image" => {
+                                let png_out = input.parent().unwrap().join(format!(
+                                    "{}_oxyon.png",
+                                    input.file_stem().unwrap_or_default().to_string_lossy()
+                                ));
+                                let png_str = png_out.to_str().unwrap().to_string();
+                                log_info(&format!("Image html_to_image: {:?} -> {}", input, png_str));
+                                if modules::pic::html_to_image(&input, &png_str, 1024) { Ok(()) }
+                                else { Err(format!("pic::html_to_image failed for {:?}", input)) }
                             },
                             autre => {
                                 log_warn(&format!("Image: action inconnue '{}', fallback compresser", autre));
@@ -869,13 +1019,41 @@ impl eframe::App for OxyonApp {
         }
         ctx.input(|i| {
             if !i.raw.dropped_files.is_empty() {
-                self.current_files = i.raw.dropped_files.iter().filter_map(|f| f.path.clone()).collect();
+                self.current_files = i.raw.dropped_files.iter().filter_map(|f| {
+                    // Standard path (works on Windows and macOS)
+                    if let Some(ref path) = f.path {
+                        return Some(path.clone());
+                    }
+                    // Linux fallback: some DEs provide the path as bytes (file:// URI)
+                    if let Some(ref bytes) = f.bytes {
+                        let text = String::from_utf8_lossy(bytes);
+                        for line in text.lines() {
+                            let line = line.trim();
+                            if line.starts_with("file://") {
+                                let path_str = line.trim_start_matches("file://");
+                                let decoded = percent_decode(path_str);
+                                let p = std::path::PathBuf::from(&decoded);
+                                if p.exists() {
+                                    return Some(p);
+                                }
+                            }
+                        }
+                    }
+                    // Last resort: try the name field
+                    if !f.name.is_empty() {
+                        let p = std::path::PathBuf::from(&f.name);
+                        if p.exists() { return Some(p); }
+                    }
+                    None
+                }).collect();
                 if let Some(p) = self.current_files.first() {
                     self.current_stem = p.file_stem().unwrap_or_default().to_string_lossy().to_string();
                 }
                 #[cfg(feature = "api")]
                 self.results_ui.lock().unwrap().clear();
-                *self.status.lock().unwrap() = self.lang.files_loaded.replace("{}", &self.current_files.len().to_string());
+                if !self.current_files.is_empty() {
+                    *self.status.lock().unwrap() = self.lang.files_loaded.replace("{}", &self.current_files.len().to_string());
+                }
             }
         });
         if let Some(ref mut c) = self.process {
@@ -1068,7 +1246,8 @@ impl eframe::App for OxyonApp {
                         ui.label(self.lang.action_label);
                         egui::ComboBox::from_id_salt("doc_action").selected_text(&self.doc_action).show_ui(ui, |ui| {
 							ui.selectable_value(&mut self.doc_action, "Convert".into(), self.lang.doc_convert);
-                            ui.selectable_value(&mut self.doc_action, "pdf_compress".into(), self.lang.doc_pdf_compress);
+                            ui.selectable_value(&mut self.doc_action, "pdf_annotate".into(), "PDF Annotate");
+							ui.selectable_value(&mut self.doc_action, "pdf_compress".into(), self.lang.doc_pdf_compress);
 							ui.selectable_value(&mut self.doc_action, "pdf_crop".into(), self.lang.doc_pdf_crop);
                             ui.selectable_value(&mut self.doc_action, "pdf_delete_pages".into(), self.lang.doc_pdf_delete_pages);
 							ui.selectable_value(&mut self.doc_action, "pdf_merge".into(), self.lang.doc_pdf_merge);
@@ -1077,6 +1256,7 @@ impl eframe::App for OxyonApp {
 							ui.selectable_value(&mut self.doc_action, "pdf_protect".into(), self.lang.doc_pdf_protect);
                             ui.selectable_value(&mut self.doc_action, "pdf_repair".into(), self.lang.doc_pdf_repair);
 							ui.selectable_value(&mut self.doc_action, "pdf_rotate".into(), self.lang.doc_pdf_rotate);
+                            ui.selectable_value(&mut self.doc_action, "pdf_sign".into(), "PDF Sign");
 							ui.selectable_value(&mut self.doc_action, "pdf_split".into(), self.lang.doc_pdf_split);
 							ui.selectable_value(&mut self.doc_action, "pdf_unlock".into(), self.lang.doc_pdf_unlock);
                             ui.selectable_value(&mut self.doc_action, "pdf_watermark".into(), self.lang.doc_pdf_watermark);
@@ -1212,6 +1392,55 @@ impl eframe::App for OxyonApp {
                                 ui.label(self.lang.pages_hint);
                             });
                         },
+                        "pdf_annotate" => {
+                            ui.label("Add a text annotation (FreeText) to PDF pages.");
+                            ui.horizontal(|ui| {
+                                ui.label("Text:");
+                                ui.text_edit_singleline(&mut self.pdf_annot_texte);
+                            });
+                            ui.label("Position & size (% of page):");
+                            ui.horizontal(|ui| {
+                                ui.label("X:");
+                                ui.add(egui::Slider::new(&mut self.pdf_annot_x, 0.0..=100.0).fixed_decimals(1));
+                                ui.label("Y:");
+                                ui.add(egui::Slider::new(&mut self.pdf_annot_y, 0.0..=100.0).fixed_decimals(1));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("W:");
+                                ui.add(egui::Slider::new(&mut self.pdf_annot_w, 1.0..=100.0).fixed_decimals(1));
+                                ui.label("H:");
+                                ui.add(egui::Slider::new(&mut self.pdf_annot_h, 1.0..=100.0).fixed_decimals(1));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label(self.lang.pages_label);
+                                ui.text_edit_singleline(&mut self.pdf_pages_spec);
+                                ui.label(self.lang.pages_hint);
+                            });
+                        },
+                        "pdf_sign" => {
+                            ui.label("Add a visual signature line with name and date.");
+                            ui.horizontal(|ui| {
+                                ui.label("Name:");
+                                ui.text_edit_singleline(&mut self.pdf_sign_nom);
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label(self.lang.doc_position);
+                                egui::ComboBox::from_id_salt("pdf_signpos").selected_text(&self.pdf_sign_position).show_ui(ui, |ui| {
+                                    for pos in ["BasCentre","BasGauche","BasDroite","HautCentre","HautGauche","HautDroite"] {
+                                        ui.selectable_value(&mut self.pdf_sign_position, pos.into(), pos);
+                                    }
+                                });
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label(self.lang.doc_size);
+                                ui.add(egui::Slider::new(&mut self.pdf_sign_taille, 6.0..=24.0).fixed_decimals(0));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label(self.lang.pages_label);
+                                ui.text_edit_singleline(&mut self.pdf_pages_spec);
+                                ui.label(self.lang.pages_hint);
+                            });
+                        },
                         _ => {}
                     }
                 },
@@ -1221,8 +1450,12 @@ impl eframe::App for OxyonApp {
                         egui::ComboBox::from_id_salt("img_action").selected_text(&self.image_action).show_ui(ui, |ui| {
                             ui.selectable_value(&mut self.image_action, "Convert".into(), self.lang.doc_convert);
 							ui.selectable_value(&mut self.image_action, "crop".into(), self.lang.img_crop);
+                            ui.selectable_value(&mut self.image_action, "html_to_image".into(), "HTML to Image");
+                            ui.selectable_value(&mut self.image_action, "meme".into(), "Meme Generator");
                             ui.selectable_value(&mut self.image_action, "resize".into(), self.lang.img_resize);
                             ui.selectable_value(&mut self.image_action, "rotate".into(), self.lang.img_rotate);
+                            ui.selectable_value(&mut self.image_action, "upscale".into(), "Upscale");
+                            ui.selectable_value(&mut self.image_action, "watermark".into(), "Watermark");
                         });
                     });
                     ui.separator();
@@ -1241,6 +1474,17 @@ impl eframe::App for OxyonApp {
                             }
                             if ui.add(egui::Slider::new(&mut self.ratio_img, 1..=10).text(self.lang.img_quality_slider)).changed() {
                                 self.save_config();
+                            }
+                            // Output size (optional, for all formats)
+                            if self.format_choisi.to_uppercase() != "ICO" {
+                                ui.separator();
+                                ui.label("Output size (optional, leave empty for original):");
+                                ui.horizontal(|ui| {
+                                    ui.label("W:");
+                                    ui.add(egui::TextEdit::singleline(&mut self.resize_width).desired_width(60.0).hint_text("px"));
+                                    ui.label("H:");
+                                    ui.add(egui::TextEdit::singleline(&mut self.resize_height).desired_width(60.0).hint_text("px"));
+                                });
                             }
                             // Sous-options JXL
                             if self.format_choisi.to_uppercase() == "JXL" {
@@ -1264,6 +1508,28 @@ impl eframe::App for OxyonApp {
                                     "pivot" => { ui.small("Re-decode via PNG pivot for problematic files, output: {name}_pivot.jxl."); },
                                     _ => { ui.small("Lossless JXL next to the original, skips if .jxl already exists."); },
                                 }
+                            }
+                            // Sous-options ICO
+                            if self.format_choisi.to_uppercase() == "ICO" {
+                                ui.separator();
+                                ui.label("ICO sizes (multi-size icon):");
+                                ui.horizontal(|ui| {
+                                    ui.checkbox(&mut self.ico_size_16, "16×16");
+                                    ui.checkbox(&mut self.ico_size_32, "32×32");
+                                    ui.checkbox(&mut self.ico_size_64, "64×64");
+                                });
+                                ui.horizontal(|ui| {
+                                    ui.checkbox(&mut self.ico_size_128, "128×128");
+                                    ui.checkbox(&mut self.ico_size_256, "256×256");
+                                    ui.checkbox(&mut self.ico_size_512, "512×512");
+                                });
+                                ui.horizontal(|ui| {
+                                    ui.checkbox(&mut self.ico_size_custom, "Custom:");
+                                    ui.add_enabled(self.ico_size_custom, egui::TextEdit::singleline(&mut self.ico_custom_w).desired_width(50.0).hint_text("W"));
+                                    ui.label("×");
+                                    ui.add_enabled(self.ico_size_custom, egui::TextEdit::singleline(&mut self.ico_custom_h).desired_width(50.0).hint_text("H"));
+                                });
+                                ui.small("Check multiple sizes to generate a multi-resolution .ico file.");
                             }
                         },
                         "resize" => {
@@ -1316,6 +1582,48 @@ impl eframe::App for OxyonApp {
                                 ui.label(self.lang.img_height);
                                 ui.add(egui::Slider::new(&mut self.crop_height, 1..=100));
                             });
+                        },
+                        "watermark" => {
+                            ui.label("Add a text watermark over the image.");
+                            ui.horizontal(|ui| {
+                                ui.label("Text:");
+                                ui.text_edit_singleline(&mut self.img_wm_texte);
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Size:");
+                                ui.add(egui::Slider::new(&mut self.img_wm_taille, 12.0..=120.0).fixed_decimals(0));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Opacity:");
+                                ui.add(egui::Slider::new(&mut self.img_wm_opacite, 0.05..=1.0).fixed_decimals(2));
+                            });
+                        },
+                        "meme" => {
+                            ui.label("Add meme-style text (white on black bars).");
+                            ui.horizontal(|ui| {
+                                ui.label("Top text:");
+                                ui.text_edit_singleline(&mut self.img_meme_top);
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Bottom text:");
+                                ui.text_edit_singleline(&mut self.img_meme_bottom);
+                            });
+                        },
+                        "upscale" => {
+                            ui.label("Enlarge image using Lanczos interpolation.");
+                            ui.horizontal(|ui| {
+                                ui.label("Factor:");
+                                egui::ComboBox::from_id_salt("upscale_factor").selected_text(format!("{}x", self.img_upscale_factor)).show_ui(ui, |ui| {
+                                    ui.selectable_value(&mut self.img_upscale_factor, 2, "2x");
+                                    ui.selectable_value(&mut self.img_upscale_factor, 3, "3x");
+                                    ui.selectable_value(&mut self.img_upscale_factor, 4, "4x");
+                                    ui.selectable_value(&mut self.img_upscale_factor, 8, "8x");
+                                });
+                            });
+                        },
+                        "html_to_image" => {
+                            ui.label("Render an HTML file as a PNG image.");
+                            ui.small("Drop an .html file, output will be a PNG snapshot of the text content.");
                         },
                         _ => {}
                     }
@@ -1951,6 +2259,19 @@ impl eframe::App for OxyonApp {
                             }
                         });
                         ui.label(self.lang.settings_jobs_hint);
+                        ui.separator();
+                        ui.heading("Logs");
+                        if ui.button("📋 Open log file").clicked() {
+                            let log_path = std::env::current_exe()
+                                .ok()
+                                .and_then(|p| p.parent().map(|d| d.join("oxyon.log")))
+                                .unwrap_or_else(|| std::path::PathBuf::from("oxyon.log"));
+                            if log_path.exists() {
+                                let _ = open::that(&log_path);
+                            } else {
+                                *self.status.lock().unwrap() = "No log file found.".into();
+                            }
+                        }
                     });
                 },
             }
@@ -2001,6 +2322,26 @@ impl eframe::App for OxyonApp {
             if !self.current_files.is_empty() { if ui.button(self.lang.clear_all).clicked() { self.current_files.clear(); } }
         });
     }
+}
+fn percent_decode(input: &str) -> String {
+    let mut result = Vec::new();
+    let bytes = input.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Ok(val) = u8::from_str_radix(
+                std::str::from_utf8(&bytes[i+1..i+3]).unwrap_or(""),
+                16,
+            ) {
+                result.push(val);
+                i += 3;
+                continue;
+            }
+        }
+        result.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&result).to_string()
 }
 fn parse_pages_spec(spec: &str) -> Option<Vec<u32>> {
     let trimmed = spec.trim();
