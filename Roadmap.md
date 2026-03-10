@@ -9,7 +9,10 @@
 * 🔍 **Scrap**
     * ⚠️ *Sensitive*
 * 🏷️ **Tag**
+    * Mp3tag features
 * 🛠️ **Tools**
+    * Icaros features
+    * Mediainfo features
 * 🎬 **Video**
 * ⚙️ **Settings**
 
