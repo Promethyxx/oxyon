@@ -15,7 +15,7 @@
 ## 🔴 NOW
 * 🖥️ **Github CI**
     * Update
-* **Flathub**
+* 🏬 **Flathub**
     * Video demo
 * ⌨️ **OxyCLI**
     * Update
