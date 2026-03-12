@@ -1,6 +1,6 @@
 # 🚀 Oxyon
 
-🟢 OK
+## 🟢 OK
 * 📦 **Archive**
 * 🎵 **Audio**
 * 📄 **Doc**
@@ -12,10 +12,10 @@
 * ⚙️ **Settings**
 ---
 
-🔴 NOW
+## 🔴 NOW
 * 🖥️ **Github CI**
     * Update
-* Flathub
+* **Flathub**
     * Video demo
 * ⌨️ **OxyCLI**
     * Update
@@ -23,12 +23,12 @@
     * Update
 ---
 
-🟡 NEXT
+## 🟡 NEXT
 * 🔍 **Scrap**
     * Search improvement
 ---
 
-🔵 LATER
+## 🔵 LATER
 * 🏷️ **Tag**
     * Add Mp3tag features
 * 🛠️ **Tools**
